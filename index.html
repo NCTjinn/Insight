@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Assisted Data Analysis System</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- External CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="brand">DataInsight AI</div>
+        <button class="theme-toggle" id="theme-btn" title="Toggle Dark Mode">
+            <!-- Sun Icon (Default) -->
+            <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+        </button>
+    </header>
+
+    <main>
+        <!-- SECTION 1: Upload -->
+        <section id="upload-section">
+            <h2>Analyze Your Data</h2>
+            <p style="color: var(--text-secondary);">Upload a CSV/Excel file or provide a Google Sheets URL.</p>
+            
+            <div class="drop-zone" id="drop-zone">
+                <input type="file" id="file-input" style="display: none;" accept=".csv, .xlsx">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin-bottom: 10px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p><strong>Click to Upload File</strong> or drag & drop</p>
+            </div>
+
+            <div style="display: flex; align-items: center; margin: 1.5rem 0;">
+                <div style="flex:1; height:1px; background:var(--border);"></div>
+                <span style="padding:0 10px; color:var(--text-secondary); font-size:0.8rem;">OR</span>
+                <div style="flex:1; height:1px; background:var(--border);"></div>
+            </div>
+
+            <input type="text" class="url-input" placeholder="Paste Google Sheets URL here..." id="url-input">
+
+            <button class="btn-analyze" id="analyze-btn" disabled>Analyze Data</button>
+        </section>
+
+        <!-- SECTION 2: Dashboard -->
+        <section id="dashboard-section">
+            <div class="dashboard-header">
+                <h2>Analysis Dashboard</h2>
+                <p style="color: var(--text-secondary);">System processed <strong>4</strong> inferred visualizations from your dataset.</p>
+                <button class="btn-secondary-outline" onclick="resetApp()">Analyze New Data</button>
+            </div>
+
+            <div id="chart-grid">
+                <!-- Cards injected via JS -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Mass Export Widget -->
+    <div id="mass-export-widget">
+        <div class="widget-info">
+            <span class="widget-count" id="selected-count">0</span>
+            <span class="widget-label">Charts Selected</span>
+        </div>
+        <div class="widget-actions">
+            <button class="widget-btn" onclick="massExport('charts')">Export All Charts</button>
+            <!-- ID added to control state via JS -->
+            <button id="btn-export-all-summary" class="widget-btn secondary disabled" onclick="massExport('reports')">Export All Charts+Summaries</button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>This system does not store user-uploaded data beyond the duration of this session. (NFR2)</p>
+    </footer>
+
+    <!-- External JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
