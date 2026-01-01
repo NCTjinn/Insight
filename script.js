@@ -243,8 +243,8 @@ function massExport(type) {
     const count = ids.length;
     
     if (type === 'charts') {
-        alert(`Exporting ${count} charts as a single PDF file...`);
+        alert(`Exporting ${count} chart(s) as a single PDF file...`);
     } else {
-        alert(`Exporting ${count} charts (Charts + AI Summaries) as a single PDF file...`);
+        alert(`Exporting ${count} chart(s) (Charts + AI Summaries) as a single PDF file...`);
     }
 }
