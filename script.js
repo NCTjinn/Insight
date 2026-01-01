@@ -10,6 +10,20 @@ let selectedCharts = new Set();
 let generatedSummaryIds = new Set(); // Track which charts have generated summaries
 let charts = {}; // Store Chart.js instances
 
+// Color palette for multi-color charts
+const colorPalette = [
+    '#2563eb', // Blue
+    '#10b981', // Green
+    '#f59e0b', // Amber
+    '#ef4444', // Red
+    '#8b5cf6', // Purple
+    '#ec4899', // Pink
+    '#14b8a6', // Teal
+    '#f97316', // Orange
+    '#06b6d4', // Cyan
+    '#84cc16'  // Lime
+];
+
 // --- DOM ELEMENTS ---
 const uploadSection = document.getElementById('upload-section');
 const dashboardSection = document.getElementById('dashboard-section');
@@ -89,7 +103,7 @@ function initDashboard() {
     const primaryColor = styles.getPropertyValue('--primary').trim();
     const gridColor = styles.getPropertyValue('--chart-grid').trim();
 
-    // CHANGE 1: Force Chart Text to Blue (#2563eb)
+    // Force Chart Text to Blue (#2563eb)
     Chart.defaults.color = '#2563eb'; 
     Chart.defaults.borderColor = gridColor;
 
@@ -116,7 +130,7 @@ function initDashboard() {
                 <p class="ai-content">${item.ai}</p>
             </div>
             <div class="card-footer">
-                <!-- CHANGE 4: ID added to AI button for transformation -->
+                <!--  ID added to AI button for transformation -->
                 <button class="action-btn ai-btn" id="ai-btn-${item.id}" onclick="generateAI(${item.id})">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Generate AI
@@ -131,7 +145,23 @@ function initDashboard() {
 
         // Init Chart
         const ctx = document.getElementById(`canvas-${item.id}`).getContext('2d');
-        const bg = item.type === 'line' ? primaryColor + '20' : primaryColor; // Add transparency for line
+        
+        // Determine colors based on chart type
+        let backgroundColor, borderColor;
+        
+        if (item.type === 'doughnut' || item.type === 'pie') {
+            // Multiple colors for doughnut/pie charts
+            backgroundColor = colorPalette.slice(0, item.data.length);
+            borderColor = '#ffffff';
+        } else if (item.type === 'bar') {
+            // Multiple colors for bar charts
+            backgroundColor = colorPalette.slice(0, item.data.length);
+            borderColor = colorPalette.slice(0, item.data.length);
+        } else {
+            // Single color with transparency for line charts
+            backgroundColor = primaryColor + '20';
+            borderColor = primaryColor;
+        }
         
         charts[item.id] = new Chart(ctx, {
             type: item.type,
@@ -140,9 +170,9 @@ function initDashboard() {
                 datasets: [{
                     label: item.y,
                     data: item.data,
-                    backgroundColor: bg,
-                    borderColor: primaryColor,
-                    borderWidth: 2,
+                    backgroundColor: backgroundColor,
+                    borderColor: borderColor,
+                    borderWidth: item.type === 'doughnut' ? 3 : 2,
                     fill: item.type === 'line',
                     tension: 0.3
                 }]
@@ -150,7 +180,12 @@ function initDashboard() {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: item.type === 'doughnut' } }
+                plugins: { 
+                    legend: { 
+                        display: item.type === 'doughnut' || item.type === 'pie',
+                        position: 'bottom'
+                    } 
+                }
             }
         });
     });
@@ -187,7 +222,7 @@ function updateWidget() {
         return;
     }
 
-    // CHANGE 3: Check if selected charts have summaries to enable "Export All Charts+Summaries"
+    // Check if selected charts have summaries to enable "Export All Charts+Summaries"
     const hasGeneratedSummary = Array.from(selectedCharts).some(id => generatedSummaryIds.has(id));
     
     if (hasGeneratedSummary) {
@@ -213,7 +248,7 @@ function generateAI(id) {
         loader.classList.remove('active');
         summaryBox.classList.add('visible');
         
-        // CHANGE 4: Transform AI Button to "Export with Insights"
+        // Transform AI Button to "Export with Insights"
         aiBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export with Insights`;
         
         // Update the onclick handler of this button to export with summary
@@ -243,7 +278,7 @@ function massExport(type) {
     const count = ids.length;
     
     if (type === 'charts') {
-        alert(`Exporting ${count} chart(s) as a single PDF file...`);
+        alert(`Exporting ${count} chart(s) (Charts Only) as a single PDF file...`);
     } else {
         alert(`Exporting ${count} chart(s) (Charts + AI Summaries) as a single PDF file...`);
     }
