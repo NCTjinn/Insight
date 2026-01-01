@@ -234,7 +234,7 @@ function singleExport(id) {
 
 // 3b. Single Export (Chart + Summary) - Used by transformed button
 function singleExportWithSummary(id) {
-    alert(`Generating PDF Report for Chart #${id}...\n\nIncludes: Chart Visual + AI Summary.`);
+    alert(`Generating PDF for Chart #${id}...\n\nIncludes: Chart Visual + AI Summary.`);
 }
 
 // 4. Mass Export
@@ -243,8 +243,8 @@ function massExport(type) {
     const count = ids.length;
     
     if (type === 'charts') {
-        alert(`Exporting ${count} charts as individual PDF files...`);
+        alert(`Exporting ${count} charts as a single PDF file...`);
     } else {
-        alert(`Exporting ${count} comprehensive reports (Charts + AI Summaries) as a single PDF file...`);
+        alert(`Exporting ${count} charts (Charts + AI Summaries) as a single PDF file...`);
     }
 }
