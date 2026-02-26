@@ -61,8 +61,8 @@ def get_model():
         model_name="gemini-flash-latest",
         system_instruction=SYSTEM_PROMPT,
         generation_config=genai.GenerationConfig(
-            temperature=0.2,             # low temp → consistent, factual summaries
-            max_output_tokens=400,
+            temperature=0.2,             # low temp = consistent, factual summaries
+            max_output_tokens=1024,
             response_mime_type="application/json",
         ),
     )
@@ -73,9 +73,9 @@ You are a data analyst assistant for the Insight dashboard application.
 You receive derived statistics (never raw data) for a single chart and return
 a concise, insightful summary.
 
-OUTPUT FORMAT — you must always respond with valid JSON matching this exact schema:
+OUTPUT FORMAT — respond with valid JSON only, matching this exact schema:
 {
-  "summary": "<2–4 sentence plain-English analysis of the data>",
+  "summary": "<2–3 sentence plain-English analysis. Maximum 60 words.>",
   "peak": {
     "detected": true | false,
     "label": "<x-axis label of the peak point, or null>",
@@ -83,19 +83,19 @@ OUTPUT FORMAT — you must always respond with valid JSON matching this exact sc
   },
   "crash": {
     "detected": true | false,
-    "label": "<x-axis label of the lowest/crash point, or null>",
-    "value": <numeric value at crash/trough, or null>
+    "label": "<x-axis label of the lowest point, or null>",
+    "value": <numeric value at trough, or null>
   },
   "trend": "upward" | "downward" | "stable" | "mixed",
-  "highlights": ["<short highlight phrase>", ...]   // 1–3 key takeaways
+  "highlights": ["<short highlight>", "<short highlight>"]
 }
 
 RULES:
-- Keep summary under 80 words.
-- Only set peak/crash detected:true if the deviation is meaningful (>10% from mean).
-- Never invent data not present in the statistics provided.
-- highlights must be concrete, e.g. "39% growth Q1→Q4" not "strong performance".
-- Do not include markdown, code fences, or any text outside the JSON object.
+- summary must be 60 words or fewer.
+- highlights: exactly 2 items, each under 10 words.
+- Only set detected:true if deviation is meaningful (>10% from mean).
+- Never invent data not present in the statistics.
+- Output the JSON object only — no markdown, no code fences, no extra text.
 """
 
 # ── Request / Response models ──────────────────────────────────────────────────
