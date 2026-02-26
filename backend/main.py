@@ -60,11 +60,10 @@ def get_model():
     return genai.GenerativeModel(
         model_name="gemini-flash-latest",
         system_instruction=SYSTEM_PROMPT,
-        generation_config=genai.GenerationConfig(
-            temperature=0.2,             # low temp = consistent, factual summaries
-            max_output_tokens=1024,
-            response_mime_type="application/json",
-        ),
+        generation_config={
+            "temperature": 0.1,
+            "response_mime_type": "application/json",
+        },
     )
 
 # ── System prompt ──────────────────────────────────────────────────────────────
@@ -186,7 +185,7 @@ async def summarise(req: SummariseRequest):
         crash      = PeakInfo(**parsed.get("crash", {"detected": False})),
         trend      = parsed.get("trend", req.y_stats.trend),
         highlights = parsed.get("highlights", []),
-        model      = "gemini-1.5-flash",
+        model      = "gemini-flash-latest",
     )
 
 
@@ -230,32 +229,38 @@ def build_prompt(req: SummariseRequest) -> str:
     lines.append("\nReturn the JSON summary as specified in your instructions.")
     return "\n".join(lines)
 
+import re
+import json
 
 def parse_gemini_response(text: str) -> dict:
     """
-    Parse the Gemini JSON response, stripping any accidental markdown fences.
-    Raises ValueError if the result is not valid JSON or missing required keys.
+    Extracts and parses JSON from Gemini's response. 
+    Handles markdown fences, leading/trailing text, and minor truncations.
     """
-    original = text  # keep for logging
-
-    # Strip ```json ... ``` fences if present (safety net despite system prompt)
-    if text.startswith("```"):
-        lines = text.splitlines()
-        text = "\n".join(
-            l for l in lines
-            if not l.strip().startswith("```")
-        ).strip()
-
-    # If the string was truncated mid-JSON, attempt to close it gracefully.
-    # This handles the most common truncation: an unterminated final string/array.
-    text = _attempt_json_repair(text)
-
+    original_text = text
+    
+    # 1. Try to find the first '{' and the last '}' to extract only the JSON object.
+    # This ignores any "Sure, here is the JSON:" preamble or trailing markdown fences.
+    match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+    if match:
+        text = match.group(0)
+    
+    # 2. Attempt a standard load
     try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        log.error("Raw Gemini output (first 500 chars): %s", original[:500])
-        raise ValueError(f"JSON decode error: {exc}")
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # 3. If standard load fails, try the repair logic for truncated responses
+        repaired_text = _attempt_json_repair(text)
+        try:
+            data = json.loads(repaired_text)
+            log.info("Successfully repaired Gemini JSON output.")
+            return data
+        except json.JSONDecodeError as exc:
+            # Log the full raw text so you can debug it in Cloud Run logs
+            log.error(f"Critical JSON Failure. Raw output: {original_text}")
+            raise ValueError(f"JSON decode error at {exc.lineno}:{exc.colno}: {exc.msg}")
 
+    # 4. Final Validation of keys
     required = {"summary", "peak", "crash", "trend", "highlights"}
     missing = required - data.keys()
     if missing:
