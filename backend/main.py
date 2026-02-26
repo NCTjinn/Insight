@@ -236,6 +236,8 @@ def parse_gemini_response(text: str) -> dict:
     Parse the Gemini JSON response, stripping any accidental markdown fences.
     Raises ValueError if the result is not valid JSON or missing required keys.
     """
+    original = text  # keep for logging
+
     # Strip ```json ... ``` fences if present (safety net despite system prompt)
     if text.startswith("```"):
         lines = text.splitlines()
@@ -244,9 +246,14 @@ def parse_gemini_response(text: str) -> dict:
             if not l.strip().startswith("```")
         ).strip()
 
+    # If the string was truncated mid-JSON, attempt to close it gracefully.
+    # This handles the most common truncation: an unterminated final string/array.
+    text = _attempt_json_repair(text)
+
     try:
         data = json.loads(text)
     except json.JSONDecodeError as exc:
+        log.error("Raw Gemini output (first 500 chars): %s", original[:500])
         raise ValueError(f"JSON decode error: {exc}")
 
     required = {"summary", "peak", "crash", "trend", "highlights"}
@@ -255,6 +262,33 @@ def parse_gemini_response(text: str) -> dict:
         raise ValueError(f"Missing keys in Gemini response: {missing}")
 
     return data
+
+
+def _attempt_json_repair(text: str) -> str:
+    """
+    Best-effort repair of truncated JSON from Gemini.
+    Tries progressively truncating to the last complete top-level value.
+    """
+    # Already valid — return as-is
+    try:
+        json.loads(text)
+        return text
+    except json.JSONDecodeError:
+        pass
+
+    # Try trimming to the last closing brace
+    last_brace = text.rfind("}")
+    if last_brace != -1:
+        candidate = text[: last_brace + 1]
+        try:
+            json.loads(candidate)
+            log.warning("Repaired truncated Gemini JSON by trimming to last '}'")
+            return candidate
+        except json.JSONDecodeError:
+            pass
+
+    # No repair possible — return original and let caller raise
+    return text
 
 
 # ── Dev server entrypoint ──────────────────────────────────────────────────────
