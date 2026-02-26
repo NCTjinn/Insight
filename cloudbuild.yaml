@@ -1,0 +1,62 @@
+# cloudbuild.yaml — Insight Backend CI/CD
+# ─────────────────────────────────────────────────────────────────────────────
+# Triggered automatically on push to main branch (configure in Cloud Build UI).
+# Builds the Docker image, pushes to Artifact Registry, deploys to Cloud Run.
+#
+# Required substitutions (set in Cloud Build trigger or pass via --substitutions):
+#   _REGION          GCP region, e.g. asia-southeast1
+#   _SERVICE         Cloud Run service name, e.g. insight-backend
+#   _REPO            Artifact Registry repo, e.g. insight
+#   _ALLOWED_ORIGIN  Frontend URL, e.g. https://nctjinn.github.io
+
+substitutions:
+  _REGION:         asia-southeast1
+  _SERVICE:        insight-backend
+  _REPO:           insight
+  _ALLOWED_ORIGIN: https://nctjinn.github.io
+
+steps:
+  # ── 1. Build Docker image ───────────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+      - .
+    dir: backend
+
+  # ── 2. Push to Artifact Registry ────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}
+
+  # ── 3. Deploy to Cloud Run ───────────────────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --set-secrets=GEMINI_API_KEY=GEMINI_API_KEY:latest
+      - --set-env-vars=ALLOWED_ORIGIN=${_ALLOWED_ORIGIN}
+      - --min-instances=0
+      - --max-instances=5
+      - --memory=512Mi
+      - --cpu=1
+      - --timeout=30
+      - --concurrency=80
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/${_SERVICE}:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY

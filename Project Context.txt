@@ -1,0 +1,40 @@
+Project Name: Insight
+Frontend: HTML/CSS/Javascript, hosted on Github Static Pages
+Backend: Python hosted on Cloud Run
+External service: Gemini API
+SheetJS for Excel Parsing, ApexCharts for charts, jsPDF+html2canvas for PDF export, PapaParse for CSV parsing
+
+User Flow:
+1. User accesses the initial web page, uploads an excel file or google sheets URL.
+2. After processing, user is directed to a dashboard page, displaying 3 automatically generated charts in individual cards.
+3. The user can individually generate an AI summary for each chart, or manually create/remove charts.
+4. The user can individually, or select multiple charts to export the chart with or without the AI summary, in PDF or image formats.
+
+System Flow:
+1. After the user uploads an excel file or google sheets URL, each column is processed to determine the role, category, and trend.
+2. Based on the derived data of each columns, a set of suggested charts are generated, then charts are automatically generated.
+3. When the user requests for an AI summary, derived data (along with units) for that chart is sent to backend.
+4. The backend calls Gemini API to generate the summary then sends back to frontend to be displayed.
+
+Key Notes:
+1. Calculations are performed on frontend using Web Worker, only derived data is sent to backend, which then calls Gemini API with it. Goal is to minimise token usage.
+2. The system does not store user-uploaded data beyond the duration of a session. Only derived data is sent to Gemini API, to maintain privacy and security.
+3. The frontend is build as a Single Page Application (SPA) to keep the data in memory without a database.
+4. The system only supports public URLs for Google Sheets, and will prompt the user to make it public, providing detailed step-by-step instructions to do so.
+5. To ensure Gemini provides consistent summaries, System Instructions in the backend define a strict output format.
+6. AI responses are cached in the frontend to prevent repeated API calls.
+7. Implement Data Downsampling if dataset has >1000 rows.
+8. If the backend fails, the user shouldn't lose their dashboard; only that specific summary card should show an error.
+9. Set Gemini temperature to a low value in backend.
+
+Additional Features:
+1. Day/Night modes
+2. User may edit chart titles
+3. Time range control
+4. User may remove generated charts
+5. User may generate new charts automatically (one-click) or manually (select X and Y axes)
+6. "Save Session" button that exports a small JSON file containing the derived data and AI summaries, allowing user to re-upload this JSON later without re-running API calls
+7. If the AI summary identifies a "Peak" or "Crash," have the frontend highlight that specific point on the chart.
+8. Allow users to resize or reorder the cards.
+9. A clear privacy notice on the interface in all pages, along with a link to the github page (https://github.com/NCTjinn/Insight/)
+10. The user interface shall be responsive and functional on most devices

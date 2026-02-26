@@ -1,95 +1,1476 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Insight</title>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- External CSS -->
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Insight — Data Analytics Dashboard</title>
+  <!-- Single font: Outfit only -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.1/dist/apexcharts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <style>
+    :root {
+      --bg:         #0d1117;
+      --surface:    #161b22;
+      --surface2:   #1f2937;
+      --surface3:   #252d3a;
+      --accent:     #00d4aa;
+      --accent-dim: rgba(0,212,170,0.12);
+      --accent2:    #f59e0b;
+      --accent2-dim:rgba(245,158,11,0.12);
+      --text:       #e6edf3;
+      --text-muted: #7d8590;
+      --text-faint: #3d444d;
+      --border:     #21282f;
+      --border-lit: #30363d;
+      --danger:     #f85149;
+      --success:    #3fb950;
+      --radius:     10px;
+      --radius-lg:  16px;
+      --shadow:     0 4px 24px rgba(0,0,0,0.4);
+      --shadow-sm:  0 2px 8px rgba(0,0,0,0.3);
+      --t:          0.2s ease;
+    }
+    [data-theme="light"] {
+      --bg:         #f0f4f8;
+      --surface:    #ffffff;
+      --surface2:   #f6f8fa;
+      --surface3:   #eef1f5;
+      --accent:     #008f72;
+      --accent-dim: rgba(0,143,114,0.1);
+      --accent2:    #c47b00;
+      --accent2-dim:rgba(196,123,0,0.1);
+      --text:       #111827;
+      --text-muted: #6b7280;
+      --text-faint: #d1d5db;
+      --border:     #e5e7eb;
+      --border-lit: #d1d5db;
+      --danger:     #dc2626;
+      --success:    #16a34a;
+      --shadow:     0 4px 24px rgba(0,0,0,0.08);
+      --shadow-sm:  0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background var(--trans),color var(--trans);overflow-x:hidden}
+    button,input,select,textarea{font-family:'Outfit',sans-serif}
+    button{cursor:pointer}
+
+    /* Noise */
+    body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:9999;opacity:0.4}
+    [data-theme="light"] body::before{opacity:0.15}
+
+    /* SPA */
+    .page{display:none;min-height:100vh;flex-direction:column}
+    .page.active{display:flex;animation:pageIn .3s ease}
+    @keyframes pageIn{from{opacity:0}to{opacity:1}}
+
+    /* ── UPLOAD PAGE ── */
+    #page-upload{background:var(--bg);position:relative;overflow:hidden}
+    #page-upload::after{content:'';position:absolute;top:-200px;right:-200px;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,170,0.06) 0%,transparent 70%);pointer-events:none}
+
+    .upload-header{display:flex;align-items:center;justify-content:space-between;padding:24px 48px;border-bottom:1px solid var(--border);position:relative;z-index:2}
+    .wordmark{font-weight:800;font-size:22px;letter-spacing:-0.5px;color:var(--accent)}
+    .header-actions{display:flex;align-items:center;gap:12px}
+
+    .upload-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;position:relative;z-index:2}
+    .hero-sub{font-size:16px;color:var(--text-muted);text-align:center;margin-bottom:48px;max-width:460px;line-height:1.6;font-weight:300}
+
+    .upload-card{background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius-lg);padding:40px;width:100%;max-width:560px;box-shadow:var(--shadow)}
+
+    .upload-tabs{display:flex;background:var(--surface2);border-radius:var(--radius);padding:4px;margin-bottom:28px;gap:2px}
+    .upload-tab{flex:1;padding:9px 12px;border:none;background:transparent;color:var(--text-muted);font-size:13px;font-weight:500;border-radius:7px;transition:all var(--trans)}
+    .upload-tab.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+
+    .dropzone{border:2px dashed var(--border-lit);border-radius:var(--radius);padding:40px 24px;text-align:center;cursor:pointer;transition:all var(--trans);position:relative;overflow:hidden}
+    .dropzone:hover,.dropzone.drag-over{border-color:var(--accent);background:var(--accent-dim)}
+    .dropzone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .dropzone-icon{width:48px;height:48px;background:var(--accent-dim);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:var(--accent)}
+    .dropzone-title{font-weight:600;font-size:15px;margin-bottom:6px}
+    .dropzone-sub{font-size:13px;color:var(--text-muted)}
+
+    .url-form{display:flex;flex-direction:column;gap:12px}
+    .input-field{width:100%;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);padding:11px 14px;color:var(--text);font-size:14px;outline:none;transition:border-color var(--trans)}
+    .input-field:focus{border-color:var(--accent)}
+    .input-field::placeholder{color:var(--text-muted)}
+    .input-label{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:block}
+    .sheets-note{background:var(--accent2-dim);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius);padding:12px 14px;font-size:12px;color:var(--accent2);line-height:1.5}
+
+    /* Buttons */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:var(--radius);font-size:14px;font-weight:500;border:none;outline:none;transition:all var(--trans);text-decoration:none}
+    .btn-primary{background:var(--accent);color:#0d1117;font-weight:600}
+    .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,212,170,.3)}
+    .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border-lit)}
+    .btn-secondary:hover{background:var(--surface3);border-color:var(--accent)}
+    .btn-ghost{background:transparent;color:var(--text-muted);border:1px solid var(--border-lit)}
+    .btn-ghost:hover{color:var(--text);background:var(--surface2)}
+    .btn-icon{width:34px;height:34px;padding:0;border-radius:8px}
+    .btn-full{width:100%}
+
+    .divider-text{display:flex;align-items:center;gap:12px;color:var(--text-faint);font-size:12px;margin:20px 0}
+    .divider-text::before,.divider-text::after{content:'';flex:1;height:1px;background:var(--border)}
+
+    .session-upload-area{border:2px dashed var(--border-lit);border-radius:var(--radius);padding:32px 24px;text-align:center;cursor:pointer;transition:all var(--trans);position:relative}
+    .session-upload-area:hover{border-color:var(--accent2);background:var(--accent2-dim)}
+    .session-upload-area input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+    .privacy-badge{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin-top:16px;justify-content:center}
+
+    .upload-footer{padding:24px 48px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--text-muted)}
+
+    /* Theme toggle — icon button (moon in dark, sun in light) */
+    .theme-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--border-lit);color:var(--text-muted);transition:all var(--trans);cursor:pointer;flex-shrink:0}
+    .theme-btn:hover{color:var(--text);border-color:var(--accent)}
+    .theme-btn .icon-moon{display:block}
+    .theme-btn .icon-sun{display:none}
+    [data-theme="light"] .theme-btn .icon-moon{display:none}
+    [data-theme="light"] .theme-btn .icon-sun{display:block}
+
+    /* Privacy notice */
+    .privacy-notice{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:12px;color:var(--text-muted);line-height:1.5;display:flex;align-items:flex-start;gap:10px}
+    .privacy-notice svg{flex-shrink:0;margin-top:1px;color:var(--accent)}
+    .privacy-notice a{color:var(--accent);text-decoration:none}
+    .privacy-notice a:hover{text-decoration:underline}
+
+    /* ── DASHBOARD ── */
+    #page-dashboard{background:var(--bg)}
+
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:58px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:100;gap:12px}
+    .topbar-left{display:flex;align-items:center;gap:16px;min-width:0;flex:1}
+    .topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+
+    .topbar-wordmark{font-weight:800;font-size:18px;letter-spacing:-0.4px;color:var(--accent);flex-shrink:0}
+
+    /* Dataset badge — truncate long filenames */
+    .dataset-badge{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--text-muted);min-width:0;max-width:260px}
+    .dataset-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);animation:pulse 2s infinite;flex-shrink:0}
+    .dataset-badge span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+    /* Demo banner */
+    .demo-banner{background:linear-gradient(90deg,var(--accent2-dim),rgba(245,158,11,.05));border-bottom:1px solid rgba(245,158,11,.2);padding:8px 32px;display:none;align-items:center;gap:10px;font-size:12px;color:var(--accent2)}
+
+    /* Toolbar */
+    .dash-toolbar{display:flex;align-items:center;justify-content:space-between;padding:16px 32px;gap:12px;flex-wrap:wrap}
+    .dash-toolbar-left{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .dash-toolbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+    /* Preset time buttons */
+    .time-range-btns{display:flex;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);overflow:hidden}
+    .time-btn{padding:6px 13px;border:none;background:transparent;color:var(--text-muted);font-size:12px;font-weight:500;transition:all var(--trans);cursor:pointer}
+    .time-btn:hover{color:var(--text);background:var(--surface3)}
+    .time-btn.active{background:var(--accent);color:#0d1117;font-weight:600}
+
+    /* Custom date range */
+    .date-range-wrap{position:relative}
+    .date-range-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border-lit);color:var(--text-muted);font-size:12px;font-weight:500;cursor:pointer;transition:all var(--trans);white-space:nowrap}
+    .date-range-btn:hover{border-color:var(--accent);color:var(--text)}
+    .date-range-btn.has-value{border-color:var(--accent);color:var(--accent)}
+
+    .date-picker-popover{position:absolute;top:calc(100% + 8px);left:0;background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius-lg);padding:20px;z-index:200;box-shadow:var(--shadow);min-width:310px;display:none;animation:fadeIn .15s ease}
+    .date-picker-popover.open{display:block}
+    .date-picker-row{display:flex;gap:12px;margin-bottom:14px}
+    .date-picker-field{flex:1;display:flex;flex-direction:column;gap:5px}
+    .date-picker-field label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.7px}
+    .date-input{background:var(--surface2);border:1px solid var(--border-lit);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none;transition:border-color var(--trans);color-scheme:dark;width:100%}
+    [data-theme="light"] .date-input{color-scheme:light}
+    .date-input:focus{border-color:var(--accent)}
+    .date-picker-actions{display:flex;gap:8px;justify-content:flex-end}
+
+    /* Chart grid */
+    .chart-grid{padding:0 32px 32px;display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+
+    /* Cards — overflow visible so ApexCharts tooltips + annotation labels + dropdowns render outside the card boundary */
+    .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:visible;transition:border-color var(--trans),box-shadow var(--trans);position:relative;animation:fadeUp .4s ease forwards;opacity:0}
+    .chart-card:nth-child(1){animation-delay:.05s}
+    .chart-card:nth-child(2){animation-delay:.10s}
+    .chart-card:nth-child(3){animation-delay:.15s}
+    .chart-card:nth-child(4){animation-delay:.20s}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .chart-card:hover{border-color:var(--border-lit);box-shadow:var(--shadow-sm)}
+    .chart-card.full-width{grid-column:1/-1}
+    .chart-card.dragging{opacity:.5;border:2px dashed var(--accent)}
+    .chart-card.drag-target{border:2px dashed var(--accent2)}
+
+    /* Inner wrapper clips visual bg/radius but not positioned children */
+    /* overflow:visible so tooltips/dropdowns inside card-actions are never clipped */
+    .card-inner{background:var(--surface);border-radius:var(--radius-lg);overflow:visible}
+
+    .card-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;gap:12px}
+    .card-title-wrap{flex:1;min-width:0}
+    .card-title{font-size:15px;font-weight:700;color:var(--text);cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;outline:none;border-radius:4px;padding:2px 4px;margin:-2px -4px;transition:background var(--trans)}
+    .card-title:hover{background:var(--surface2)}
+    .card-title:focus{background:var(--surface2);white-space:normal;overflow:visible}
+    .card-title-hint{font-size:10px;color:var(--text-faint);letter-spacing:.5px;margin-top:1px}
+    .card-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+    .card-chart{padding:0 8px}
+    .card-ai-section{padding:0 20px 20px}
+
+    .ai-generate-btn{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);color:var(--text-muted);font-size:13px;font-weight:500;transition:all var(--trans);margin-top:4px}
+    .ai-generate-btn:hover{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+    .ai-generate-btn .ai-icon{width:20px;height:20px;background:linear-gradient(135deg,var(--accent),#0099ff);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px}
+
+    .ai-summary-box{margin-top:4px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);padding:14px 16px;animation:fadeIn .3s ease;display:none}
+    .ai-summary-box.visible{display:block}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .ai-summary-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .ai-label{display:flex;align-items:center;gap:6px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
+    .ai-label-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+    .ai-summary-text{font-size:13px;line-height:1.65;color:var(--text-muted)}
+    .ai-summary-text strong{color:var(--text);font-weight:600}
+    .ai-highlight-peak{display:inline-flex;align-items:center;gap:4px;background:rgba(63,185,80,.15);border:1px solid rgba(63,185,80,.3);color:var(--success);border-radius:4px;padding:0 5px;font-size:11px;font-weight:500}
+    .ai-highlight-crash{display:inline-flex;align-items:center;gap:4px;background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.25);color:var(--danger);border-radius:4px;padding:0 5px;font-size:11px;font-weight:500}
+    .ai-error-box{margin-top:4px;background:rgba(248,81,73,.06);border:1px solid rgba(248,81,73,.2);border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--danger);display:none}
+    .ai-error-box.visible{display:block}
+    .ai-skeleton{display:none;padding:14px 16px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);margin-top:4px}
+    .ai-skeleton.visible{display:block}
+    .skeleton-line{height:10px;background:linear-gradient(90deg,var(--surface3) 25%,var(--surface2) 50%,var(--surface3) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:4px;margin-bottom:8px}
+    .skeleton-line:last-child{width:60%;margin-bottom:0}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+    /* Modal */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity var(--trans)}
+    .modal-overlay.open{opacity:1;pointer-events:all}
+    .modal{background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius-lg);padding:32px;width:100%;max-width:520px;box-shadow:var(--shadow);transform:translateY(16px);transition:transform var(--trans)}
+    .modal-overlay.open .modal{transform:translateY(0)}
+    .modal-title{font-size:20px;font-weight:700;margin-bottom:8px}
+    .modal-sub{font-size:13px;color:var(--text-muted);margin-bottom:24px}
+    .form-row{display:flex;gap:12px}
+    .form-group{flex:1;display:flex;flex-direction:column;gap:6px}
+    .select-field{width:100%;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);padding:10px 14px;color:var(--text);font-size:14px;outline:none;appearance:none;cursor:pointer}
+    .select-field:focus{border-color:var(--accent)}
+    .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+    .chart-type-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+    .chart-type-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;background:var(--surface2);border:1.5px solid var(--border-lit);border-radius:var(--radius);color:var(--text-muted);font-size:11px;transition:all var(--trans);cursor:pointer}
+    .chart-type-btn:hover{border-color:var(--accent);color:var(--text)}
+    .chart-type-btn.selected{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+    .chart-type-btn svg{width:24px;height:24px}
+
+    .card-resize-btn{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;color:var(--text-muted);cursor:pointer;transition:all var(--trans)}
+    .card-resize-btn:hover{background:var(--surface2);border-color:var(--border-lit)}
+
+    /* Dropdown — high z-index to render above everything */
+    .dropdown{position:relative}
+    .dropdown-menu{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius);padding:6px;min-width:180px;box-shadow:var(--shadow);z-index:250;display:none}
+    .dropdown-menu.open{display:block}
+    .dropdown-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all var(--trans);border:none;background:transparent;width:100%;text-align:left}
+    .dropdown-item:hover{background:var(--surface2);color:var(--text)}
+    .dropdown-separator{height:1px;background:var(--border);margin:4px 0}
+
+    /* Toast */
+    .toast-container{position:fixed;bottom:24px;right:24px;z-index:400;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+    .toast{background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius);padding:12px 16px;font-size:13px;color:var(--text);box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;pointer-events:all;animation:slideIn .3s ease;min-width:240px}
+    .toast.success{border-color:rgba(63,185,80,.3)}
+    .toast.success::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0}
+    .toast.error{border-color:rgba(248,81,73,.3)}
+    .toast.error::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--danger);flex-shrink:0}
+    @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+    /* Selection bar */
+    .selection-bar{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:100px;padding:10px 20px;box-shadow:var(--shadow),0 0 0 1px var(--accent);z-index:350;align-items:center;gap:16px;font-size:13px}
+    .selection-bar.visible{display:flex}
+    .selection-count{font-weight:600;color:var(--accent)}
+    .card-checkbox{position:absolute;top:16px;left:16px;width:18px;height:18px;accent-color:var(--accent);cursor:pointer;z-index:5;opacity:0;transition:opacity var(--trans)}
+    .selection-mode .card-checkbox{opacity:1}
+
+    /* Tooltip */
+    /* ---- Tooltips ---- */
+    [data-tip]{position:relative}
+    /* Default: show ABOVE the element */
+    [data-tip]::after{
+      content:attr(data-tip);position:absolute;
+      bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);
+      background:var(--surface3);color:var(--text);font-size:11px;
+      padding:4px 9px;border-radius:5px;white-space:nowrap;
+      opacity:0;pointer-events:none;transition:opacity var(--trans);
+      border:1px solid var(--border-lit);z-index:9000;
+    }
+    [data-tip]:hover::after{opacity:1}
+    /* Topbar & upload header: flip to show BELOW (avoids viewport top edge) */
+    .topbar [data-tip]::after,
+    .header-actions [data-tip]::after{
+      bottom:auto;top:calc(100% + 7px);
+    }
+    /* Card actions: show BELOW so they don't clip against card top */
+    .card-actions [data-tip]::after{
+      bottom:auto;top:calc(100% + 7px);
+    }
+
+    .drag-handle{cursor:grab;color:var(--text-faint);display:flex;align-items:center}
+    .drag-handle:active{cursor:grabbing}
+
+    /* Scrollbar */
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border-lit);border-radius:3px}
+
+    /* Responsive */
+    @media(max-width:900px){.chart-grid{grid-template-columns:1fr;padding:0 16px 24px}.topbar,.dash-toolbar{padding:0 16px}.dash-toolbar{padding:12px 16px}.upload-header,.upload-footer{padding:16px 24px}}
+    @media(max-width:600px){.upload-card{padding:24px}.topbar-right .btn span{display:none}.date-picker-popover{min-width:260px}}
+  </style>
 </head>
 <body>
 
-    <!-- Header -->
-    <header>
-        <div class="brand">Insight</div>
-        <button class="theme-toggle" id="theme-btn" title="Toggle Dark Mode">
-            <!-- Sun Icon (Default) -->
-            <svg class="sun-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="5"></circle>
-                <line x1="12" y1="1" x2="12" y2="3"></line>
-                <line x1="12" y1="21" x2="12" y2="23"></line>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                <line x1="1" y1="12" x2="3" y2="12"></line>
-                <line x1="21" y1="12" x2="23" y2="12"></line>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-            </svg>
-        </button>
-    </header>
+<!-- LOADING OVERLAY — shown while parser.worker.js processes the file -->
+<div id="parse-overlay" style="display:none;position:fixed;inset:0;z-index:500;
+  background:rgba(13,17,23,0.85);backdrop-filter:blur(6px);
+  flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div style="width:40px;height:40px;border:3px solid #30363d;border-top-color:#00d4aa;
+    border-radius:50%;animation:spin .8s linear infinite;"></div>
+  <div id="parse-status" style="font-size:13px;color:#7d8590;
+    max-width:420px;text-align:center;line-height:1.6;font-family:'Plus Jakarta Sans',sans-serif;"></div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
-    <main>
-        <!-- SECTION 1: Upload -->
-        <section id="upload-section">
-            <h2>Analyze Your Data</h2>
-            <p style="color: var(--text-secondary);">Upload a CSV/Excel file or provide a Google Sheets URL.</p>
-            
-            <div class="drop-zone" id="drop-zone">
-                <input type="file" id="file-input" style="display: none;" accept=".csv, .xlsx">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="margin-bottom: 10px;">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-                <p><strong>Click to Upload File</strong> or drag & drop</p>
-            </div>
+<div class="toast-container" id="toast-container"></div>
 
-            <div style="display: flex; align-items: center; margin: 1.5rem 0;">
-                <div style="flex:1; height:1px; background:var(--border);"></div>
-                <span style="padding:0 10px; color:var(--text-secondary); font-size:0.8rem;">OR</span>
-                <div style="flex:1; height:1px; background:var(--border);"></div>
-            </div>
+<!-- Selection bar -->
+<div class="selection-bar" id="selection-bar">
+  <span class="selection-count" id="selection-count">0 selected</span>
+  <button class="btn btn-secondary" onclick="exportSelected('pdf')" style="padding:6px 14px;font-size:12px;">Export PDF</button>
+  <button class="btn btn-secondary" onclick="exportSelected('img')" style="padding:6px 14px;font-size:12px;">Export Image</button>
+  <button class="btn btn-ghost" onclick="clearSelection()" style="padding:6px 12px;font-size:12px;">Cancel</button>
+</div>
 
-            <input type="text" class="url-input" placeholder="Paste Google Sheets URL here..." id="url-input">
-
-            <button class="btn-analyze" id="analyze-btn" disabled>Analyze Data</button>
-        </section>
-
-        <!-- SECTION 2: Dashboard -->
-        <section id="dashboard-section">
-            <div class="dashboard-header">
-                <h2>Analysis Dashboard</h2>
-                <p style="color: var(--text-secondary);">System processed <strong>4</strong> inferred visualizations from your dataset.</p>
-                <button class="btn-secondary-outline" onclick="resetApp()">Analyze New Data</button>
-            </div>
-
-            <div id="chart-grid">
-                <!-- Cards injected via JS -->
-            </div>
-        </section>
-    </main>
-
-    <!-- Mass Export Widget -->
-    <div id="mass-export-widget">
-        <div class="widget-info">
-            <span class="widget-count" id="selected-count">0</span>
-            <span class="widget-label">Charts Selected</span>
-        </div>
-        <div class="widget-actions">
-            <button class="widget-btn" onclick="massExport('charts')">Export All Charts</button>
-            <!-- ID added to control state via JS -->
-            <button id="btn-export-all-summary" class="widget-btn secondary disabled" onclick="massExport('reports')">Export All Charts+Summaries</button>
-        </div>
+<!-- Add chart modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <h3 class="modal-title">Add New Chart</h3>
+    <p class="modal-sub">Choose a chart type and configure the axes.</p>
+    <label class="input-label">Chart Type</label>
+    <div class="chart-type-grid">
+      <button class="chart-type-btn selected" data-type="line" onclick="selectChartType(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 7,11 11,14 15,8 21,3"/><polyline points="3,21 21,21"/></svg>Line
+      </button>
+      <button class="chart-type-btn" data-type="bar" onclick="selectChartType(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="10" width="4" height="11"/><rect x="10" y="5" width="4" height="16"/><rect x="17" y="13" width="4" height="8"/><line x1="3" y1="21" x2="21" y2="21"/></svg>Bar
+      </button>
+      <button class="chart-type-btn" data-type="area" onclick="selectChartType(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17 L7 11 L11 14 L15 8 L21 3 L21 21 L3 21 Z"/></svg>Area
+      </button>
+      <button class="chart-type-btn" data-type="donut" onclick="selectChartType(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>Donut
+      </button>
     </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="input-label">X Axis</label>
+        <select class="select-field" id="modal-x-axis">
+          <option>Month</option><option>Category</option><option>Week</option><option>Quarter</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="input-label">Y Axis</label>
+        <select class="select-field" id="modal-y-axis">
+          <option value="Revenue">Revenue</option><option value="Units">Units Sold</option>
+          <option value="Users">Active Users</option><option value="Satisfaction">Satisfaction Score</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:12px">
+      <label class="input-label">Chart Title</label>
+      <input class="input-field" id="modal-title" type="text" placeholder="e.g. Revenue by Month" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="addChartFromModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Chart
+      </button>
+    </div>
+  </div>
+</div>
 
-    <!-- Footer -->
-    <footer>
-        <p>This system does not store user-uploaded data beyond the duration of this session.</p>
-    </footer>
 
-    <!-- External JavaScript -->
-    <script src="script.js"></script>
+<!-- ════════════════════════════════════════
+     PAGE: UPLOAD
+════════════════════════════════════════ -->
+<div class="page active" id="page-upload">
+  <header class="upload-header">
+    <span class="wordmark">Insight</span>
+    <div class="header-actions">
+      <a href="https://github.com/NCTjinn/Insight/" target="_blank" class="btn btn-ghost btn-icon" data-tip="GitHub">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/></svg>
+      </a>
+      <button class="theme-btn" onclick="toggleTheme()" data-tip="Toggle theme">
+        <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun"  width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="upload-hero">
+    <p class="hero-sub">Upload your Excel file or connect a Google Sheet — Insight automatically generates charts and AI-powered summaries.</p>
+
+    <div class="upload-card">
+      <div class="privacy-notice" style="margin-bottom:20px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Your raw data never leaves your device. Only derived statistics are sent to our API for AI summaries. <a href="https://github.com/NCTjinn/Insight/" target="_blank">Learn more →</a></span>
+      </div>
+
+      <div class="upload-tabs" role="tablist">
+        <button class="upload-tab active" onclick="switchUploadTab(this,'tab-file')">Excel File</button>
+        <button class="upload-tab" onclick="switchUploadTab(this,'tab-sheets')">Google Sheets</button>
+        <button class="upload-tab" onclick="switchUploadTab(this,'tab-session')">Load Session</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-file">
+        <div class="dropzone" id="dropzone" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+          <input type="file" accept=".xlsx,.xls,.csv" onchange="handleFileInput(event)" />
+          <div class="dropzone-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <p class="dropzone-title">Drop your file here</p>
+          <p class="dropzone-sub">Excel (.xlsx, .xls) or CSV &nbsp;·&nbsp; <span style="color:var(--accent)">Browse files</span></p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-sheets">
+        <div class="sheets-note" style="margin-bottom:16px">⚠️ Only <strong>public</strong> Google Sheets URLs are supported. To make a sheet public: <em>Share → Anyone with the link → Viewer.</em></div>
+        <div class="url-form">
+          <div>
+            <label class="input-label">Google Sheets URL</label>
+            <input class="input-field" id="sheets-url" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." />
+          </div>
+          <button class="btn btn-primary btn-full" onclick="handleSheetsURL()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            Load Spreadsheet
+          </button>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-session">
+        <div class="session-upload-area">
+          <input type="file" accept=".json" onchange="handleSessionLoad(event)" />
+          <p style="font-size:15px;font-weight:600;margin-bottom:6px">Load Saved Session</p>
+          <p style="font-size:13px;color:var(--text-muted)">Drop your <code style="font-size:12px;background:var(--surface3);padding:1px 5px;border-radius:4px">session.json</code> or click to browse</p>
+        </div>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:12px;text-align:center">Sessions contain only derived statistics and AI summaries — no raw data.</p>
+      </div>
+
+      <div class="divider-text">or</div>
+
+      <button class="btn btn-secondary btn-full" onclick="loadDemoData()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Try with demo data
+      </button>
+
+      <div class="privacy-badge">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="var(--success)"><polyline points="20 6 9 17 4 12"/></svg>
+        No account required &nbsp;·&nbsp;
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="var(--success)"><polyline points="20 6 9 17 4 12"/></svg>
+        Data stays on device
+      </div>
+    </div>
+  </div>
+
+  <footer class="upload-footer">
+    <span>© 2024 Insight &nbsp;·&nbsp; <a href="https://github.com/NCTjinn/Insight/" target="_blank" style="color:var(--accent);text-decoration:none">GitHub</a></span>
+    <span>Raw data is never stored or transmitted</span>
+  </footer>
+</div>
+
+
+<!-- ════════════════════════════════════════
+     PAGE: DASHBOARD
+════════════════════════════════════════ -->
+<div class="page" id="page-dashboard">
+
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-wordmark">Insight</span>
+      <div class="dataset-badge">
+        <div class="dot"></div>
+        <span id="dataset-name">demo_data.xlsx</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost" onclick="showPage('upload')" style="font-size:12px;padding:6px 12px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Home</span>
+      </button>
+      <div class="dropdown" id="export-dropdown">
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="toggleDropdown('export-dropdown')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Export</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="dropdown-menu" id="export-dropdown-menu">
+          <button class="dropdown-item" onclick="enterSelectionMode();closeAllDropdowns()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Select charts to export
+          </button>
+          <div class="dropdown-separator"></div>
+          <button class="dropdown-item" onclick="exportAllPDF();closeAllDropdowns()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Export all as PDF
+          </button>
+          <button class="dropdown-item" onclick="exportAllImages();closeAllDropdowns()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Export all as images
+          </button>
+        </div>
+      </div>
+      <button class="btn btn-secondary" onclick="saveSession()" style="font-size:12px;padding:6px 14px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span>Save Session</span>
+      </button>
+      <button class="theme-btn" onclick="toggleTheme()" data-tip="Toggle theme">
+        <svg class="icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun"  width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="demo-banner" id="demo-banner">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    DEMO MODE — Charts below use dummy / simulated data. Upload your own file to analyse real data.
+  </div>
+
+  <div class="dash-toolbar">
+    <div class="dash-toolbar-left">
+      <!-- Preset ranges -->
+      <div class="time-range-btns">
+        <button class="time-btn" onclick="setTimeRange(this,'1M')">1M</button>
+        <button class="time-btn" onclick="setTimeRange(this,'3M')">3M</button>
+        <button class="time-btn" onclick="setTimeRange(this,'6M')">6M</button>
+        <button class="time-btn active" onclick="setTimeRange(this,'1Y')">1Y</button>
+        <button class="time-btn" onclick="setTimeRange(this,'ALL')">ALL</button>
+      </div>
+      <!-- Custom date range -->
+      <div class="date-range-wrap" id="date-range-wrap">
+        <button class="date-range-btn" id="date-range-trigger" onclick="toggleDatePicker()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span id="date-range-label">Custom range</span>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="date-picker-popover" id="date-picker-popover">
+          <div class="date-picker-row">
+            <div class="date-picker-field">
+              <label>Start date</label>
+              <input type="date" class="date-input" id="date-start" />
+            </div>
+            <div class="date-picker-field">
+              <label>End date</label>
+              <input type="date" class="date-input" id="date-end" />
+            </div>
+          </div>
+          <div class="date-picker-actions">
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="clearDateRange()">Clear</button>
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 14px" onclick="applyDateRange()">Apply</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dash-toolbar-right">
+      <button class="btn btn-ghost" onclick="autoGenerateChart()" style="font-size:12px;padding:6px 14px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>
+        Auto Generate
+      </button>
+      <button class="btn btn-primary" onclick="openModal()" style="font-size:12px;padding:6px 14px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Chart
+      </button>
+    </div>
+  </div>
+
+  <div style="padding:0 32px 12px">
+    <div class="privacy-notice">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Your raw data is processed locally and never uploaded. Only derived statistics are sent to the AI for summaries. &nbsp;<a href="https://github.com/NCTjinn/Insight/" target="_blank">View Privacy Policy on GitHub →</a></span>
+    </div>
+  </div>
+
+  <div class="chart-grid" id="chart-grid"></div>
+</div>
+
+
+<script>
+'use strict';
+
+/* ============================================================
+   DUMMY / DEMO DATA
+   Used as fallback when the user clicks "Try with demo data".
+   All values are fabricated. Only DUMMY_DERIVED would be sent
+   to the backend in production.
+============================================================ */
+const DUMMY_MONTHLY_REVENUE={
+  labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+  values:[182000,138000,165000,193000,214000,231000,208000,245000,262000,287000,271000,253000],
+  peak:{label:'Oct',value:287000},crash:{label:'Feb',value:138000},
+};
+const DUMMY_CATEGORY_SALES={
+  labels:['Cloud Pro','Analytics','Enterprise','Starter','Marketplace','Support'],
+  values:[94000,71000,118000,42000,55000,28000],
+  peak:{label:'Enterprise',value:118000},
+};
+const DUMMY_WEEKLY_USERS={
+  labels:['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12','W13','W14','W15','W16','W17','W18','W19','W20','W21','W22','W23','W24'],
+  values:[3200,3350,3100,3420,3600,3750,3920,4100,4050,3800,3650,3820,4200,4350,4500,4480,4620,4800,4900,5100,5050,4950,5200,5400],
+  peak:{label:'W24',value:5400},crash:{label:'W11',value:3650},
+};
+const DUMMY_DERIVED={
+  revenue: {mean:212417,median:219500,std:44820,min:138000,max:287000,trend:'upward',growth_rate:39.0},
+  category:{mean:68000, median:63000, std:31200,min:28000, max:118000,trend:'mixed'},
+  users:   {mean:4254,  median:4265,  std:674,  min:3100,  max:5400,  trend:'upward',growth_rate:68.8},
+};
+
+/* ============================================================
+   STATE
+============================================================ */
+const state={
+  isDemoMode:      false,
+  parsedDataset:   null,   // { columns, rowCount, downsampled, fileName, suggestions, derivedData }
+  charts:          [],
+  selectedCards:   new Set(),
+  selectionMode:   false,
+  timeRange:       '1Y',
+  customDateRange: null,
+  selectedChartType:'line',
+  nextId:          1,
+  _worker:         null,
+};
+
+/* ============================================================
+   WORKER ORCHESTRATION
+   Spins up parser.worker.js, forwards progress to the overlay,
+   and calls onParseComplete() when done.
+============================================================ */
+function dispatchToWorker(type, payload){
+  // Terminate any previous run
+  if(state._worker){ state._worker.terminate(); state._worker=null; }
+
+  showParseOverlay('Initialising parser…');
+
+  const worker = new Worker('parser.worker.js');
+  state._worker = worker;
+
+  worker.onmessage = function(e){
+    const {type:t, payload:p, message, error} = e.data;
+
+    if(t === 'PARSE_PROGRESS'){
+      // Stream worker status to overlay AND console
+      setParseStatus(message);
+      console.log('[Insight Worker]', message);
+      return;
+    }
+
+    if(t === 'PARSE_COMPLETE'){
+      worker.terminate(); state._worker = null;
+      hideParseOverlay();
+      onParseComplete(p);
+      return;
+    }
+
+    if(t === 'PARSE_ERROR'){
+      worker.terminate(); state._worker = null;
+      hideParseOverlay();
+      showToast('Parse error: ' + error, 'error');
+      console.error('[Insight Worker] PARSE_ERROR:', error);
+    }
+  };
+
+  worker.onerror = function(err){
+    worker.terminate(); state._worker = null;
+    hideParseOverlay();
+    showToast('Worker crashed: ' + err.message, 'error');
+    console.error('[Insight Worker] Uncaught error:', err);
+  };
+
+  worker.postMessage({ type, payload });
+}
+
+/* ============================================================
+   PARSE COMPLETE — called when the worker finishes
+============================================================ */
+function onParseComplete(dataset){
+  state.parsedDataset = dataset;
+  state.isDemoMode    = false;
+
+  // ---- Console verification report ----
+  logParsedDataset(dataset);
+
+  document.getElementById('dataset-name').textContent = dataset.fileName;
+  document.getElementById('demo-banner').style.display = 'none';
+
+  // Populate modal axis dropdowns with real column names
+  populateAxisDropdowns(dataset.columns);
+
+  initDashboard();
+  showPage('dashboard');
+  showToast(`"${dataset.fileName}" loaded — ${dataset.rowCount} rows, ${dataset.columns.length} columns${dataset.downsampled?' (downsampled)':''}`, 'success');
+}
+
+/* ============================================================
+   CONSOLE VERIFICATION REPORT
+   Call logParsedDataset(state.parsedDataset) in the console
+   at any time to re-print the full report.
+============================================================ */
+function logParsedDataset(ds){
+  if(!ds){ console.warn('[Insight] No dataset loaded yet.'); return; }
+
+  console.group('%c[Insight] Parsed Dataset Report', 'color:#00d4aa;font-weight:700;font-size:13px;');
+  console.log('File:      ', ds.fileName);
+  console.log('Rows:      ', ds.rowCount, ds.downsampled ? `(downsampled to ${ds.columns[0]?.values?.length})` : '');
+  console.log('Columns:   ', ds.columns.length);
+  console.groupEnd();
+
+  // Per-column breakdown
+  console.group('%c[Insight] Columns', 'color:#f59e0b;font-weight:700;');
+  ds.columns.forEach((col, i) => {
+    const g = `%c  [${i}] "${col.name}"  (${col.role})`;
+    const style = col.role==='numeric'   ? 'color:#3fb950;font-weight:600;'
+                : col.role==='date'      ? 'color:#0099ff;font-weight:600;'
+                :                          'color:#7d8590;font-weight:600;';
+    if(col.role === 'numeric' && col.stats){
+      const s = col.stats;
+      console.groupCollapsed(g, style);
+      console.log('Values (first 10):', col.values.slice(0,10));
+      console.table({
+        mean:         s.mean.toFixed(2),
+        median:       s.median.toFixed(2),
+        std:          s.std.toFixed(2),
+        min:          s.min,
+        max:          s.max,
+        trend:        s.trend,
+        growth_rate:  s.growth_rate !== null ? s.growth_rate.toFixed(2)+'%' : 'n/a',
+        peak_index:   s.peakIdx,
+        trough_index: s.troughIdx,
+      });
+      console.groupEnd();
+    } else if(col.role === 'date'){
+      console.groupCollapsed(g, style);
+      console.log('Labels (first 10):', col.labels.slice(0,10));
+      console.groupEnd();
+    } else {
+      console.groupCollapsed(g, style);
+      console.log('Top categories:', col.categories ? col.categories.slice(0,10) : col.values.slice(0,10));
+      console.groupEnd();
+    }
+  });
+  console.groupEnd();
+
+  // Derived data (what gets sent to Gemini)
+  console.group('%c[Insight] Derived Data (sent to backend)', 'color:#f85149;font-weight:700;');
+  console.log('This is the ONLY data forwarded to the AI. Raw values never leave the browser.');
+  console.log(JSON.stringify(ds.derivedData, null, 2));
+  console.groupEnd();
+
+  // Chart suggestions
+  console.group('%c[Insight] Chart Suggestions', 'color:#00d4aa;font-weight:700;');
+  ds.suggestions.forEach((s,i) => console.log(`  [${i}] "${s.title}"  type:${s.type}  x:"${s.xColumn}"  y:"${s.yColumn}"`));
+  console.groupEnd();
+
+  console.log('%c[Insight] Tip: call logParsedDataset(state.parsedDataset) to reprint this report.', 'color:#7d8590;font-style:italic;');
+}
+
+// Expose helpers for manual console use
+window.insight = { state, logParsedDataset: ()=>logParsedDataset(state.parsedDataset) };
+
+/* ============================================================
+   LOADING OVERLAY HELPERS
+============================================================ */
+function showParseOverlay(msg){
+  const el=document.getElementById('parse-overlay');
+  el.style.display='flex';
+  setParseStatus(msg);
+}
+function hideParseOverlay(){
+  document.getElementById('parse-overlay').style.display='none';
+}
+function setParseStatus(msg){
+  document.getElementById('parse-status').textContent=msg;
+}
+
+/* ============================================================
+   POPULATE AXIS DROPDOWNS from real columns
+============================================================ */
+function populateAxisDropdowns(columns){
+  const xSel=document.getElementById('modal-x-axis');
+  const ySel=document.getElementById('modal-y-axis');
+  xSel.innerHTML='';
+  ySel.innerHTML='';
+  columns.forEach(col=>{
+    const ox=document.createElement('option');
+    ox.value=col.name; ox.textContent=`${col.name} (${col.role})`;
+    xSel.appendChild(ox);
+    const oy=document.createElement('option');
+    oy.value=col.name; oy.textContent=`${col.name} (${col.role})`;
+    ySel.appendChild(oy);
+  });
+  // Default: x = first non-numeric, y = first numeric
+  const xDefault=columns.find(c=>c.role!=='numeric');
+  const yDefault=columns.find(c=>c.role==='numeric');
+  if(xDefault) xSel.value=xDefault.name;
+  if(yDefault) ySel.value=yDefault.name;
+}
+
+/* ============================================================
+   THEME
+============================================================ */
+function toggleTheme(){
+  const h=document.documentElement;
+  h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');
+  state.charts.forEach(c=>{if(c.apexInstance)c.apexInstance.updateOptions(themeOpts(),false,false)});
+}
+function themeOpts(){
+  const d=document.documentElement.getAttribute('data-theme')==='dark';
+  return{theme:{mode:d?'dark':'light'},chart:{background:'transparent',foreColor:d?'#7d8590':'#6b7280'},grid:{borderColor:d?'#21282f':'#e5e7eb'},tooltip:{theme:d?'dark':'light'}};
+}
+
+/* ============================================================
+   SPA NAVIGATION
+============================================================ */
+function showPage(n){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+n).classList.add('active');window.scrollTo(0,0)}
+function switchUploadTab(btn,id){document.querySelectorAll('.upload-tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById(id).classList.add('active')}
+
+/* ============================================================
+   FILE UPLOAD
+============================================================ */
+function onDragOver(e){e.preventDefault();e.currentTarget.classList.add('drag-over')}
+function onDragLeave(e){e.currentTarget.classList.remove('drag-over')}
+function onDrop(e){e.preventDefault();e.currentTarget.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f)processFile(f)}
+function handleFileInput(e){const f=e.target.files[0];if(f)processFile(f)}
+
+function processFile(file){
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['xlsx','xls','csv'].includes(ext)){showToast('Unsupported file type. Please use .xlsx, .xls, or .csv','error');return;}
+  const reader=new FileReader();
+  if(ext==='csv'){
+    reader.onload=ev=>dispatchToWorker('PARSE_CSV_TEXT',{text:ev.target.result,fileName:file.name});
+    reader.readAsText(file);
+  } else {
+    reader.onload=ev=>dispatchToWorker('PARSE_EXCEL',{buffer:ev.target.result,fileName:file.name});
+    reader.readAsArrayBuffer(file);
+  }
+}
+
+function handleSheetsURL(){
+  const raw=document.getElementById('sheets-url').value.trim();
+  if(!raw||!raw.includes('docs.google.com/spreadsheets')){showToast('Please enter a valid Google Sheets URL','error');return;}
+  const idMatch=raw.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  const gidMatch=raw.match(/[#&?]gid=(\d+)/);
+  if(!idMatch){showToast('Could not extract spreadsheet ID from URL','error');return;}
+  const csvUrl=`https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv&gid=${gidMatch?gidMatch[1]:'0'}`;
+  showParseOverlay('Fetching Google Sheet…');
+  fetch(csvUrl)
+    .then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status} — ensure the sheet is set to "Anyone with the link can view".`);return r.text();})
+    .then(text=>dispatchToWorker('PARSE_CSV_TEXT',{text,fileName:`sheets_${idMatch[1].slice(0,8)}.csv`}))
+    .catch(err=>{hideParseOverlay();showToast('Failed to fetch sheet: '+err.message,'error');console.error('[Insight] Sheets fetch error:',err);});
+}
+
+function handleSessionLoad(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{loadSession(JSON.parse(ev.target.result))}catch{showToast('Invalid session file','error')}};r.readAsText(f)}
+
+function loadDemoData(){
+  state.isDemoMode=true;
+  state.parsedDataset=null;
+  document.getElementById('dataset-name').textContent='demo_data.xlsx';
+  // Reset modal dropdowns to static demo options
+  const xSel=document.getElementById('modal-x-axis');
+  const ySel=document.getElementById('modal-y-axis');
+  xSel.innerHTML='<option>Month</option><option>Category</option><option>Week</option><option>Quarter</option>';
+  ySel.innerHTML='<option value="Revenue">Revenue</option><option value="Units">Units Sold</option><option value="Users">Active Users</option><option value="Satisfaction">Satisfaction Score</option>';
+  initDashboard();showPage('dashboard');
+}
+
+/* ============================================================
+   DASHBOARD INIT
+============================================================ */
+function initDashboard(){
+  state.charts=[];state.nextId=1;
+  document.getElementById('chart-grid').innerHTML='';
+  document.getElementById('demo-banner').style.display=state.isDemoMode?'flex':'none';
+
+  if(state.isDemoMode || !state.parsedDataset){
+    // Demo mode: use hardcoded dummy charts
+    addChart({title:'Monthly Revenue 2024',      type:'line', dataset:'revenue'});
+    addChart({title:'Sales by Product Category', type:'bar',  dataset:'category'});
+    addChart({title:'Weekly Active Users',        type:'area', dataset:'users'});
+  } else {
+    // Real data: use suggestions from the worker
+    const suggs=state.parsedDataset.suggestions;
+    if(suggs.length===0){
+      showToast('No chart suggestions could be generated. Try adding one manually.','error');
+      return;
+    }
+    suggs.forEach(s=>addChart({title:s.title,type:s.type,xColumn:s.xColumn,yColumn:s.yColumn}));
+  }
+}
+
+/* ============================================================
+   CHART ADD / REMOVE
+============================================================ */
+function addChart(opts){
+  const id='chart-'+(state.nextId++);
+  const entry={
+    id,
+    title:    opts.title||'New Chart',
+    type:     opts.type||'line',
+    // Demo fallback keys
+    dataset:  opts.dataset||null,
+    // Real data keys
+    xColumn:  opts.xColumn||null,
+    yColumn:  opts.yColumn||null,
+    apexInstance:null,summaryText:null,summaryLoaded:false,
+  };
+  state.charts.push(entry);
+  const card=buildCardDOM(entry);
+  document.getElementById('chart-grid').appendChild(card);
+  requestAnimationFrame(()=>{initApexChart(entry);setupCardDrag(card)});
+  return entry;
+}
+function removeChart(id){
+  const i=state.charts.findIndex(c=>c.id===id);if(i===-1)return;
+  state.charts[i].apexInstance?.destroy();
+  state.charts.splice(i,1);
+  document.getElementById(id)?.remove();
+  showToast('Chart removed','success');
+}
+function buildCardDOM(entry){
+  const card=document.createElement('div');
+  card.className='chart-card';card.id=entry.id;
+  card.setAttribute('draggable','true');card.setAttribute('data-id',entry.id);
+  card.innerHTML=`
+    <input type="checkbox" class="card-checkbox" id="chk-${entry.id}" onchange="toggleCardSelection('${entry.id}')" />
+    <div class="card-inner">
+      <div class="card-header">
+        <div class="card-title-wrap">
+          <div class="card-title" contenteditable="true" spellcheck="false"
+               onblur="updateChartTitle('${entry.id}',this.textContent)">${entry.title}</div>
+          <div class="card-title-hint">Click title to edit</div>
+        </div>
+        <div class="card-actions">
+          <span class="drag-handle" title="Drag to reorder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="9" cy="6" r="1" fill="currentColor"/><circle cx="15" cy="6" r="1" fill="currentColor"/>
+              <circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/>
+              <circle cx="9" cy="18" r="1" fill="currentColor"/><circle cx="15" cy="18" r="1" fill="currentColor"/>
+            </svg>
+          </span>
+          <button class="card-resize-btn" onclick="toggleCardSize('${entry.id}')" data-tip="Expand/collapse">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          </button>
+          <div class="dropdown" id="card-dd-${entry.id}">
+            <button class="card-resize-btn" onclick="toggleDropdown('card-dd-${entry.id}')" data-tip="More options">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="5" r="1" fill="currentColor"/>
+                <circle cx="12" cy="12" r="1" fill="currentColor"/>
+                <circle cx="12" cy="19" r="1" fill="currentColor"/>
+              </svg>
+            </button>
+            <div class="dropdown-menu" id="card-dd-${entry.id}-menu">
+              <button class="dropdown-item" onclick="exportCardPDF('${entry.id}'); closeAllDropdowns()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Export as PDF
+              </button>
+              <button class="dropdown-item" onclick="exportCardImage('${entry.id}'); closeAllDropdowns()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                Export as Image
+              </button>
+              <div class="dropdown-separator"></div>
+              <button class="dropdown-item" style="color:var(--danger)" onclick="removeChart('${entry.id}'); closeAllDropdowns()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+                Remove chart
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-chart" id="apex-${entry.id}"></div>
+      <div class="card-ai-section">
+        <button class="ai-generate-btn" id="ai-btn-${entry.id}" onclick="generateSummary('${entry.id}')">
+          <span class="ai-icon">✦</span>Generate AI summary
+        </button>
+        <div class="ai-skeleton" id="ai-skeleton-${entry.id}">
+          <div class="skeleton-line" style="width:85%"></div>
+          <div class="skeleton-line" style="width:93%"></div>
+          <div class="skeleton-line"></div>
+        </div>
+        <div class="ai-summary-box" id="ai-summary-${entry.id}"></div>
+        <div class="ai-error-box" id="ai-error-${entry.id}">⚠️ Failed to generate summary. Please try again — your dashboard is unaffected.</div>
+      </div>
+    </div>`;
+  return card;
+}
+
+/* ============================================================
+   GET CHART DATA
+   Returns { labels, values, raw } for both real and demo data.
+   For real data, pairs xColumn (labels) with yColumn (values).
+============================================================ */
+function getChartData(entry){
+  const ds = state.parsedDataset;
+
+  // ---- REAL DATA PATH ----
+  if(ds && !state.isDemoMode && entry.xColumn && entry.yColumn){
+    const xCol = ds.columns.find(c=>c.name===entry.xColumn);
+    const yCol = ds.columns.find(c=>c.name===entry.yColumn);
+    if(!xCol||!yCol) return getDemoChartData(entry.dataset);
+
+    let labels = xCol.labels;
+    let values = yCol.values.map(v=>typeof v==='number'?v:parseFloat(v)||0);
+
+    // Time range slice (only meaningful for date x-axis)
+    if(xCol.role==='date'){
+      const limits={'1M':30,'3M':90,'6M':180,'1Y':365,'ALL':Infinity};
+      const days = state.timeRange==='CUSTOM'&&state.customDateRange
+        ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
+        : (limits[state.timeRange]||Infinity);
+
+      if(days < Infinity){
+        const cutoff = Date.now() - days*86400000;
+        const idxs   = xCol.values.map((v,i)=>({v,i})).filter(({v})=>v && v>=cutoff).map(({i})=>i);
+        labels = idxs.map(i=>xCol.labels[i]);
+        values = idxs.map(i=>yCol.values[i]||0);
+      }
+    }
+
+    // Derive peak/crash from real stats
+    const raw = { peak:null, crash:null };
+    if(yCol.stats){
+      const s = yCol.stats;
+      if(s.peakIdx   < labels.length) raw.peak  = {label:labels[s.peakIdx],   value:values[s.peakIdx]};
+      if(s.troughIdx < labels.length) raw.crash = {label:labels[s.troughIdx], value:values[s.troughIdx]};
+    }
+
+    return { labels, values, raw };
+  }
+
+  // ---- DEMO FALLBACK PATH ----
+  return getDemoChartData(entry.dataset);
+}
+
+function getDemoChartData(dataset){
+  const raw = dataset==='revenue' ? DUMMY_MONTHLY_REVENUE
+            : dataset==='category'? DUMMY_CATEGORY_SALES
+            : DUMMY_WEEKLY_USERS;
+  if(dataset==='category') return{labels:[...raw.labels],values:[...raw.values],raw};
+  const limits={'1M':1,'3M':3,'6M':6,'1Y':12,'ALL':9999};
+  const n=limits[state.timeRange]||12;
+  return{labels:raw.labels.slice(-Math.min(n,raw.labels.length)),values:raw.values.slice(-Math.min(n,raw.values.length)),raw};
+}
+
+function dateDiffDays(from,to){
+  return Math.abs(new Date(to)-new Date(from))/86400000;
+}
+
+/* ============================================================
+   APEX CHARTS
+============================================================ */
+function initApexChart(entry){
+  const d=document.documentElement.getAttribute('data-theme')==='dark';
+  const{labels,values,raw}=getChartData(entry);
+  const ac='#00d4aa',ac2='#f59e0b',dng='#f85149',suc='#3fb950';
+
+  // Smart value formatter: detect currency vs plain number vs large int
+  const isRevEntry = entry.dataset==='revenue'||entry.dataset==='category'
+    || (entry.yColumn && /revenue|sales|amount|price|cost|profit|income/i.test(entry.yColumn));
+  const fmt = v => {
+    if(isRevEntry) return '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':v);
+    return v>=1000?(v/1000).toFixed(1)+'K':String(v);
+  };
+
+  const base={
+    chart:{type:entry.type==='donut'?'donut':entry.type,background:'transparent',foreColor:d?'#7d8590':'#6b7280',toolbar:{show:false},animations:{enabled:true,speed:500},fontFamily:"'Plus Jakarta Sans',sans-serif",height:240},
+    theme:{mode:d?'dark':'light'},
+    grid:{borderColor:d?'#21282f':'#e5e7eb',strokeDashArray:3,padding:{left:10,right:10,top:0,bottom:0}},
+    stroke:{curve:'smooth',width:2},dataLabels:{enabled:false},legend:{show:false},
+    tooltip:{theme:d?'dark':'light',style:{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'12px'},y:{formatter:fmt}},
+  };
+
+  let opts;
+  if(entry.type==='donut'){
+    const donutLabels = entry.xColumn && state.parsedDataset
+      ? (()=>{
+          const xc=state.parsedDataset.columns.find(c=>c.name===entry.xColumn);
+          return xc ? xc.labels.slice(0, values.length) : labels;
+        })()
+      : labels;
+    opts={...base,series:values,labels:donutLabels,colors:[ac,ac2,'#0099ff','#7c3aed',suc,dng],
+      plotOptions:{pie:{donut:{size:'68%',labels:{show:true,total:{show:true,label:'Total',color:d?'#7d8590':'#6b7280',fontSize:'12px',fontFamily:"'Plus Jakarta Sans',sans-serif",formatter:w=>{const t=w.globals.seriesTotals.reduce((a,b)=>a+b,0);return isRevEntry?'$'+(t>=1000?(t/1000).toFixed(0)+'K':t):t.toLocaleString();}}}}}}};
+    delete opts.stroke;delete opts.grid;
+  } else {
+    const pts=[];
+    if(raw.peak  &&labels.includes(raw.peak.label))  pts.push(mkAnn(raw.peak.label,  raw.peak.value,  suc,'▲ Peak'));
+    if(raw.crash &&labels.includes(raw.crash.label)) pts.push(mkAnn(raw.crash.label, raw.crash.value, dng,'▼ Low'));
+    opts={...base,series:[{name:entry.yColumn||entry.title,data:values}],
+      xaxis:{categories:labels,labels:{style:{fontSize:'11px',fontFamily:"'Plus Jakarta Sans',sans-serif"},rotate:-30,rotateAlways:labels.length>12},axisBorder:{show:false},axisTicks:{show:false}},
+      yaxis:{labels:{style:{fontSize:'11px',fontFamily:"'Plus Jakarta Sans',sans-serif"},formatter:fmt}},
+      colors:entry.type==='bar'?[ac,ac2,'#0099ff','#7c3aed',suc,dng]:[ac],
+      fill:entry.type==='area'?{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:.4,opacityTo:.01,stops:[0,100]}}:{},
+      plotOptions:entry.type==='bar'?{bar:{borderRadius:4,columnWidth:'55%',distributed:true}}:{},
+      annotations:{points:pts}};
+  }
+  const el=document.getElementById('apex-'+entry.id);if(!el)return;
+  const apex=new ApexCharts(el,opts);apex.render();entry.apexInstance=apex;
+}
+
+function mkAnn(x,y,color,text){
+  return{x,y,marker:{size:6,fillColor:color,strokeColor:color},label:{text,style:{background:color+'22',color,fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'10px'}}};
+}
+
+function updateAllCharts(){
+  state.charts.forEach(entry=>{
+    if(!entry.apexInstance)return;
+    const{labels,values}=getChartData(entry);
+    if(entry.type==='donut')entry.apexInstance.updateSeries(values);
+    else{entry.apexInstance.updateSeries([{data:values}]);entry.apexInstance.updateOptions({xaxis:{categories:labels}})}
+  });
+}
+
+/* ============================================================
+   TIME RANGE
+============================================================ */
+function setTimeRange(btn,range){
+  document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');state.timeRange=range;state.customDateRange=null;
+  updateAllCharts();closeDatePopover();
+}
+function toggleDatePopover(){document.getElementById('date-popover').classList.toggle('open')}
+function closeDatePopover(){document.getElementById('date-popover').classList.remove('open')}
+function applyCustomRange(){
+  const from=document.getElementById('date-from').value;
+  const to=document.getElementById('date-to').value;
+  if(!from||!to||from>to){showToast('Please select a valid date range','error');return;}
+  state.timeRange='CUSTOM';state.customDateRange={from,to};
+  document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-custom').classList.add('active');
+  updateAllCharts();closeDatePopover();
+  showToast('Range applied: '+from+' → '+to,'success');
+}
+document.addEventListener('click',e=>{if(!document.getElementById('time-range-wrap')?.contains(e.target))closeDatePopover()});
+
+/* ============================================================
+   CHART TITLE EDITING
+============================================================ */
+function updateChartTitle(id,t){
+  const entry=state.charts.find(c=>c.id===id);if(!entry)return;
+  entry.title=t.trim()||entry.title;
+  entry.apexInstance?.updateOptions({series:[{name:entry.title}]});
+}
+
+/* ============================================================
+   CARD RESIZE
+============================================================ */
+function toggleCardSize(id){
+  document.getElementById(id)?.classList.toggle('full-width');
+  setTimeout(()=>state.charts.find(c=>c.id===id)?.apexInstance?.updateOptions({}),100);
+}
+
+/* ============================================================
+   AI SUMMARY
+   Calls the Cloud Run backend → Gemini API when a real dataset
+   is loaded. Falls back to dummy summaries in demo mode.
+   Set BACKEND_URL to your deployed Cloud Run service URL.
+============================================================ */
+
+// ── Replace this with your Cloud Run service URL after deployment ──────────────
+// e.g. 'https://insight-backend-abc123-as.a.run.app'
+const BACKEND_URL = '';   // empty = backend not yet deployed
+
+// Demo-mode fallback summaries (used when BACKEND_URL is empty or in demo mode)
+const DUMMY_SUMMARIES={
+  revenue:{text:`Revenue grew <strong>39% year-over-year</strong>, with consistent upward momentum from April onwards. A notable trough occurred in February at $138K, likely driven by post-holiday spending contraction. The trajectory recovered strongly, hitting a <span class="ai-highlight-peak">▲ Peak: Oct — $287K</span> in October. Q4 shows slight normalisation but maintains levels well above H1 averages.`,hasPeak:true,peakLabel:'Oct',peakValue:287000,hasCrash:true,crashLabel:'Feb',crashValue:138000},
+  category:{text:`Enterprise leads all product lines at <strong>$118K</strong>, accounting for 29.1% of total Q4 revenue. Cloud Pro and Analytics together represent a further 40.6%. The Starter tier at $42K suggests limited freemium conversion. <span class="ai-highlight-peak">▲ Peak: Enterprise — $118K</span> warrants continued investment.`,hasPeak:true,peakLabel:'Enterprise',peakValue:118000,hasCrash:false},
+  users:{text:`Weekly Active Users rose <strong>68.8%</strong> from 3,200 (W1) to 5,400 (W24). A minor <span class="ai-highlight-crash">▼ Dip: W11 — 3,650</span> in Week 11 warrants investigation. Recovery was swift, reaching a <span class="ai-highlight-peak">▲ Peak: W24 — 5,400</span>. H2 acceleration may reflect improved retention.`,hasPeak:true,peakLabel:'W24',peakValue:5400,hasCrash:true,crashLabel:'W11',crashValue:3650},
+};
+
+// In-memory cache: chartId → summary response (avoids repeated API calls)
+const _summaryCache = {};
+
+async function generateSummary(id){
+  const entry=state.charts.find(c=>c.id===id); if(!entry)return;
+
+  // Restore from cache if available
+  if(_summaryCache[id]){
+    applySummary(id, entry, _summaryCache[id]); return;
+  }
+
+  document.getElementById('ai-btn-'+id).style.display='none';
+  document.getElementById('ai-skeleton-'+id).classList.add('visible');
+  document.getElementById('ai-error-'+id).classList.remove('visible');
+
+  try {
+    let result;
+
+    // ── REAL BACKEND PATH ──────────────────────────────────────────────────────
+    if(BACKEND_URL && !state.isDemoMode && state.parsedDataset && entry.yColumn){
+      const ds      = state.parsedDataset;
+      const yStats  = ds.derivedData[entry.yColumn];
+
+      if(!yStats || yStats.type === 'categorical'){
+        throw new Error('No numeric statistics available for this column.');
+      }
+
+      // Resolve x-axis labels at peak/trough index for context
+      const xCol       = ds.columns.find(c=>c.name===entry.xColumn);
+      const peakIdx    = yStats.peak_index;
+      const troughIdx  = yStats.trough_index;
+      const peakLabel  = xCol && peakIdx   != null ? xCol.labels[peakIdx]   : null;
+      const troughLabel= xCol && troughIdx != null ? xCol.labels[troughIdx] : null;
+      const xSample    = xCol ? xCol.labels.filter((_,i)=>i%Math.ceil(xCol.labels.length/20)===0).slice(0,20) : [];
+
+      const body = {
+        chart_title:  entry.title,
+        chart_type:   entry.type,
+        x_column:     entry.xColumn,
+        y_column:     entry.yColumn,
+        y_stats:      yStats,
+        peak_label:   peakLabel,
+        trough_label: troughLabel,
+        x_sample:     xSample,
+      };
+
+      console.log('[Insight] Calling backend /summarise with derived stats:', body);
+
+      const res = await fetch(BACKEND_URL + '/summarise', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body),
+        signal:  AbortSignal.timeout(25000),  // 25 s timeout
+      });
+
+      if(!res.ok){
+        const err = await res.json().catch(()=>({detail:'Unknown error'}));
+        throw new Error(`Backend ${res.status}: ${err.detail||res.statusText}`);
+      }
+
+      const data = await res.json();
+      console.log('[Insight] Backend response:', data);
+
+      // Map backend schema to internal summary descriptor
+      result = {
+        text:       formatSummaryHTML(data),
+        hasPeak:    data.peak?.detected  && data.peak.label  != null,
+        peakLabel:  data.peak?.label,
+        peakValue:  data.peak?.value,
+        hasCrash:   data.crash?.detected && data.crash.label != null,
+        crashLabel: data.crash?.label,
+        crashValue: data.crash?.value,
+        fromBackend: true,
+        highlights:  data.highlights || [],
+      };
+    }
+    // ── DEMO / FALLBACK PATH ───────────────────────────────────────────────────
+    else {
+      // Simulate latency so the UX feels natural
+      await new Promise(r=>setTimeout(r, 1600+Math.random()*700));
+      result = DUMMY_SUMMARIES[entry.dataset] || DUMMY_SUMMARIES.revenue;
+      if(!result.fromBackend) result = {...result, fromBackend:false};
+    }
+
+    _summaryCache[id] = result;
+    applySummary(id, entry, result);
+
+  } catch(err){
+    console.error('[Insight] generateSummary error:', err);
+    document.getElementById('ai-skeleton-'+id).classList.remove('visible');
+    document.getElementById('ai-error-'+id).classList.add('visible');
+    document.getElementById('ai-btn-'+id).style.display='flex';
+    // Dashboard survives — only this card shows the error
+    showToast('AI summary failed: ' + err.message, 'error');
+  }
+}
+
+/** Render the Gemini response into HTML, highlighting peak/crash tokens */
+function formatSummaryHTML(data){
+  let text = data.summary || '';
+
+  // Bold any numeric patterns that look like key values
+  text = text.replace(/(\d[\d,]*\.?\d*%?)/g, '<strong>$1</strong>');
+
+  // Append highlights as a compact list if present
+  if(data.highlights && data.highlights.length){
+    text += '<ul style="margin:8px 0 0 0;padding-left:16px;font-size:12px;color:var(--text-muted);">'
+      + data.highlights.map(h=>`<li>${h}</li>`).join('')
+      + '</ul>';
+  }
+
+  // Inline peak/crash badges
+  if(data.peak?.detected && data.peak.label){
+    const badge=`<span class="ai-highlight-peak">▲ Peak: ${data.peak.label}${data.peak.value!=null?' — '+Number(data.peak.value).toLocaleString():''}</span>`;
+    text = text.replace(data.peak.label, badge);
+  }
+  if(data.crash?.detected && data.crash.label){
+    const badge=`<span class="ai-highlight-crash">▼ Low: ${data.crash.label}${data.crash.value!=null?' — '+Number(data.crash.value).toLocaleString():''}</span>`;
+    text = text.replace(data.crash.label, badge);
+  }
+
+  return text;
+}
+
+function applySummary(id, entry, sd){
+  document.getElementById('ai-skeleton-'+id).classList.remove('visible');
+  entry.summaryText   = sd.text;
+  entry.summaryLoaded = true;
+
+  const label = sd.fromBackend ? 'AI Analysis — Gemini' : (state.isDemoMode ? 'AI Analysis — Demo' : 'AI Analysis — Stats');
+  const box   = document.getElementById('ai-summary-'+id);
+  box.innerHTML=`
+    <div class="ai-summary-header">
+      <div class="ai-label"><div class="ai-label-dot"></div> ${label}</div>
+      <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="clearSummary('${id}')">Clear</button>
+    </div>
+    <p class="ai-summary-text">${sd.text}</p>`;
+  box.classList.add('visible');
+  if(sd.hasPeak || sd.hasCrash) addAnnotationsFromSummary(entry, sd);
+}
+
+function clearSummary(id){
+  const entry=state.charts.find(c=>c.id===id);if(!entry)return;
+  document.getElementById('ai-summary-'+id).classList.remove('visible');
+  document.getElementById('ai-btn-'+id).style.display='flex';
+  entry.summaryLoaded=false; entry.summaryText=null;
+  delete _summaryCache[id];
+}
+function addAnnotationsFromSummary(entry,sd){
+  if(!entry.apexInstance||entry.type==='donut')return;
+  const pts=[];
+  if(sd.hasPeak  &&sd.peakLabel)  pts.push(mkAnn(sd.peakLabel,  sd.peakValue,  '#3fb950','▲ Peak'));
+  if(sd.hasCrash &&sd.crashLabel) pts.push(mkAnn(sd.crashLabel, sd.crashValue, '#f85149','▼ Low'));
+  entry.apexInstance.updateOptions({annotations:{points:pts}},false,false);
+}
+
+/* ============================================================
+   AUTO GENERATE
+============================================================ */
+const AUTO_CFGS=[
+  {title:'Revenue Overview',      type:'line',  dataset:'revenue'},
+  {title:'Category Distribution', type:'donut', dataset:'category'},
+  {title:'User Growth Trend',     type:'area',  dataset:'users'},
+];
+let autoIdx=0;
+function autoGenerateChart(){
+  if(!state.isDemoMode&&state.parsedDataset){
+    // Cycle through real column combinations
+    const ds=state.parsedDataset;
+    const nums=ds.columns.filter(c=>c.role==='numeric');
+    const xs=ds.columns.filter(c=>c.role!=='numeric');
+    if(nums.length&&xs.length){
+      const xc=xs[autoIdx%xs.length];
+      const yc=nums[autoIdx%nums.length];
+      autoIdx++;
+      addChart({title:`${yc.name} by ${xc.name} (auto)`,type:'bar',xColumn:xc.name,yColumn:yc.name});
+      showToast('Chart auto-generated','success');
+      return;
+    }
+  }
+  const cfg=AUTO_CFGS[autoIdx++%AUTO_CFGS.length];
+  addChart({...cfg,title:cfg.title+' (auto)'});
+  showToast('Chart auto-generated','success');
+}
+
+/* ============================================================
+   ADD CHART MODAL
+============================================================ */
+function openModal(){document.getElementById('modal-overlay').classList.add('open')}
+function closeModal(e){if(!e||e.target===document.getElementById('modal-overlay'))document.getElementById('modal-overlay').classList.remove('open')}
+function selectChartType(btn){document.querySelectorAll('.chart-type-btn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');state.selectedChartType=btn.getAttribute('data-type')}
+function addChartFromModal(){
+  const title=document.getElementById('modal-title').value.trim();
+  const xCol=document.getElementById('modal-x-axis').value;
+  const yCol=document.getElementById('modal-y-axis').value;
+
+  if(!state.isDemoMode&&state.parsedDataset){
+    // Real data mode
+    addChart({title:title||`${yCol} by ${xCol}`,type:state.selectedChartType,xColumn:xCol,yColumn:yCol});
+  } else {
+    // Demo mode
+    const dsMap={Revenue:'revenue',Units:'category',Users:'users',Satisfaction:'users'};
+    addChart({title:title||`${yCol} by ${xCol}`,type:state.selectedChartType,dataset:dsMap[yCol]||'revenue'});
+  }
+  closeModal();document.getElementById('modal-title').value='';
+  showToast('Chart added','success');
+}
+
+/* ============================================================
+   DRAG TO REORDER
+============================================================ */
+let dragSrcId=null;
+function setupCardDrag(card){
+  card.addEventListener('dragstart',e=>{dragSrcId=card.getAttribute('data-id');card.classList.add('dragging');e.dataTransfer.effectAllowed='move'});
+  card.addEventListener('dragend',()=>{card.classList.remove('dragging');document.querySelectorAll('.chart-card').forEach(c=>c.classList.remove('drag-target'));dragSrcId=null});
+  card.addEventListener('dragover',e=>{e.preventDefault();if(card.getAttribute('data-id')!==dragSrcId)card.classList.add('drag-target')});
+  card.addEventListener('dragleave',()=>card.classList.remove('drag-target'));
+  card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag-target');if(!dragSrcId||card.getAttribute('data-id')===dragSrcId)return;const grid=document.getElementById('chart-grid'),src=document.getElementById(dragSrcId),kids=Array.from(grid.children);if(kids.indexOf(src)<kids.indexOf(card))grid.insertBefore(src,card.nextSibling);else grid.insertBefore(src,card)});
+}
+
+/* ============================================================
+   SELECTION MODE
+============================================================ */
+function enterSelectionMode(){state.selectionMode=true;state.selectedCards.clear();document.getElementById('chart-grid').classList.add('selection-mode');updateSelectionBar()}
+function clearSelection(){state.selectionMode=false;state.selectedCards.clear();document.getElementById('chart-grid').classList.remove('selection-mode');document.querySelectorAll('.card-checkbox').forEach(c=>c.checked=false);document.getElementById('selection-bar').classList.remove('visible')}
+function toggleCardSelection(id){state.selectedCards.has(id)?state.selectedCards.delete(id):state.selectedCards.add(id);updateSelectionBar()}
+function updateSelectionBar(){document.getElementById('selection-count').textContent=state.selectedCards.size+' selected';document.getElementById('selection-bar').classList.toggle('visible',state.selectedCards.size>0||state.selectionMode)}
+
+/* ============================================================
+   EXPORT
+============================================================ */
+async function exportCardPDF(id){const card=document.getElementById(id);if(!card)return;showToast('Preparing PDF…','success');try{const canvas=await html2canvas(card,{backgroundColor:null,scale:2});const{jsPDF}=window.jspdf;const pdf=new jsPDF({orientation:'landscape',unit:'mm'});const pw=pdf.internal.pageSize.getWidth()-20;pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,pw,pw/(canvas.width/canvas.height));pdf.save('insight-chart.pdf');showToast('PDF exported','success')}catch{showToast('Export failed','error')}}
+async function exportCardImage(id){const card=document.getElementById(id);if(!card)return;showToast('Preparing image…','success');try{const canvas=await html2canvas(card,{backgroundColor:null,scale:2});const a=document.createElement('a');a.download='insight-chart.png';a.href=canvas.toDataURL('image/png');a.click();showToast('Image exported','success')}catch{showToast('Export failed','error')}}
+async function exportSelected(fmt){for(const id of state.selectedCards){if(fmt==='pdf')await exportCardPDF(id);else await exportCardImage(id)}clearSelection()}
+async function exportAllPDF(){showToast('Exporting all charts…','success');try{const{jsPDF}=window.jspdf;const pdf=new jsPDF({orientation:'landscape',unit:'mm'});const cards=document.querySelectorAll('.chart-card');for(let i=0;i<cards.length;i++){const canvas=await html2canvas(cards[i],{backgroundColor:null,scale:2});const pw=pdf.internal.pageSize.getWidth()-20;if(i>0)pdf.addPage();pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,pw,pw/(canvas.width/canvas.height))}pdf.save('insight-dashboard.pdf');showToast('Dashboard PDF exported','success')}catch{showToast('Export failed','error')}}
+async function exportAllImages(){for(const c of document.querySelectorAll('.chart-card'))await exportCardImage(c.id)}
+
+/* ============================================================
+   SESSION SAVE / LOAD
+============================================================ */
+function saveSession(){
+  const session={
+    version:'1.0',savedAt:new Date().toISOString(),
+    datasetName:document.getElementById('dataset-name').textContent,
+    charts:state.charts.map(c=>({id:c.id,title:c.title,type:c.type,dataset:c.dataset,xColumn:c.xColumn,yColumn:c.yColumn,summaryText:c.summaryText})),
+    derivedData:state.parsedDataset?state.parsedDataset.derivedData:DUMMY_DERIVED,
+  };
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(session,null,2)],{type:'application/json'}));
+  a.download='insight-session.json';a.click();
+  showToast('Session saved','success');
+}
+function loadSession(session){
+  if(!session.version||!session.charts){showToast('Invalid session file','error');return;}
+  state.isDemoMode=false;state.parsedDataset=null;
+  document.getElementById('dataset-name').textContent=session.datasetName||'session.json';
+  document.getElementById('demo-banner').style.display='none';
+  document.getElementById('chart-grid').innerHTML='';
+  state.charts=[];state.nextId=1;
+  session.charts.forEach(cfg=>{
+    const entry=addChart({title:cfg.title,type:cfg.type,dataset:cfg.dataset,xColumn:cfg.xColumn,yColumn:cfg.yColumn});
+    if(cfg.summaryText){
+      entry.summaryText=cfg.summaryText;entry.summaryLoaded=true;
+      requestAnimationFrame(()=>{
+        const box=document.getElementById('ai-summary-'+entry.id);if(!box)return;
+        box.innerHTML=`<div class="ai-summary-header"><div class="ai-label"><div class="ai-label-dot"></div> AI Analysis — Cached</div><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="clearSummary('${entry.id}')">Clear</button></div><p class="ai-summary-text">${cfg.summaryText}</p>`;
+        box.classList.add('visible');document.getElementById('ai-btn-'+entry.id).style.display='none';
+      });
+    }
+  });
+  showPage('dashboard');showToast('Session loaded','success');
+}
+
+/* ============================================================
+   DROPDOWNS
+============================================================ */
+function toggleDropdown(id){const menu=document.getElementById(id+'-menu');if(!menu)return;const was=menu.classList.contains('open');closeAllDropdowns();if(!was)menu.classList.add('open')}
+function closeAllDropdowns(){document.querySelectorAll('.dropdown-menu').forEach(m=>m.classList.remove('open'))}
+document.addEventListener('click',e=>{if(!e.target.closest('.dropdown'))closeAllDropdowns()});
+
+/* ============================================================
+   TOAST
+============================================================ */
+function showToast(msg,type='success'){const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;document.getElementById('toast-container').appendChild(t);setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300)},3500)}
+
+/* ============================================================
+   KEYBOARD + RESIZE
+============================================================ */
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();clearSelection();closeAllDropdowns();closeDatePopover()}});
+const _deb=(fn,d)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),d)}};
+window.addEventListener('resize',_deb(()=>{state.charts.forEach(c=>{try{c.apexInstance?.updateOptions({})}catch{}})},200));
+</script>
 </body>
 </html>
