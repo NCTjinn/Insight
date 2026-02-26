@@ -58,7 +58,7 @@ def get_model():
         return None
     genai.configure(api_key=GEMINI_API_KEY)
     return genai.GenerativeModel(
-        model_name="gemini-1.5-flash",   # fast + cost-effective; swap for gemini-1.5-pro for richer output
+        model_name="gemini-flash-latest",
         system_instruction=SYSTEM_PROMPT,
         generation_config=genai.GenerationConfig(
             temperature=0.2,             # low temp → consistent, factual summaries
