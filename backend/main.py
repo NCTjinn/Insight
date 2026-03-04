@@ -75,16 +75,6 @@ a concise, insightful summary.
 OUTPUT FORMAT — respond with valid JSON only, matching this exact schema:
 {
   "summary": "<2–3 sentence plain-English analysis. Maximum 60 words.>",
-  "peak": {
-    "detected": true | false,
-    "label": "<x-axis label of the peak point, or null>",
-    "value": <numeric value at peak, or null>
-  },
-  "crash": {
-    "detected": true | false,
-    "label": "<x-axis label of the lowest point, or null>",
-    "value": <numeric value at trough, or null>
-  },
   "trend": "upward" | "downward" | "stable" | "mixed",
   "highlights": ["<short highlight>", "<short highlight>"]
 }
@@ -92,7 +82,6 @@ OUTPUT FORMAT — respond with valid JSON only, matching this exact schema:
 RULES:
 - summary must be 60 words or fewer.
 - highlights: exactly 2 items, each under 10 words.
-- Only set detected:true if deviation is meaningful (>10% from mean).
 - Never invent data not present in the statistics.
 - Output the JSON object only — no markdown, no code fences, no extra text.
 """
@@ -116,20 +105,10 @@ class SummariseRequest(BaseModel):
     x_column:     str   = Field(..., description="Name of the x-axis column")
     y_column:     str   = Field(..., description="Name of the y-axis column")
     y_stats:      NumericStats = Field(..., description="Derived stats for the y-axis column")
-    # Optional context labels (e.g. the x-axis labels at peak/trough index)
-    peak_label:   Optional[str]   = None
-    trough_label: Optional[str]   = None
     x_sample:     Optional[list]  = Field(None, description="Up to 20 representative x-axis labels")
-
-class PeakInfo(BaseModel):
-    detected: bool
-    label:    Optional[str]  = None
-    value:    Optional[float] = None
 
 class SummariseResponse(BaseModel):
     summary:    str
-    peak:       PeakInfo
-    crash:      PeakInfo
     trend:      str
     highlights: list[str]
     model:      str          # which Gemini model was used
@@ -181,8 +160,6 @@ async def summarise(req: SummariseRequest):
 
     return SummariseResponse(
         summary    = parsed["summary"],
-        peak       = PeakInfo(**parsed.get("peak",  {"detected": False})),
-        crash      = PeakInfo(**parsed.get("crash", {"detected": False})),
         trend      = parsed.get("trend", req.y_stats.trend),
         highlights = parsed.get("highlights", []),
         model      = "gemini-flash-latest",
@@ -216,11 +193,6 @@ def build_prompt(req: SummariseRequest) -> str:
         lines.append(f"  Growth rate: {s.growth_rate:.2f}%")
     if s.row_count is not None:
         lines.append(f"  Row count:   {s.row_count}")
-
-    if req.peak_label:
-        lines.append(f"\nPeak x-label (at max value):   {req.peak_label}")
-    if req.trough_label:
-        lines.append(f"Trough x-label (at min value): {req.trough_label}")
 
     if req.x_sample:
         sample = req.x_sample[:20]   # cap at 20 labels
@@ -261,7 +233,7 @@ def parse_gemini_response(text: str) -> dict:
             raise ValueError(f"JSON decode error at {exc.lineno}:{exc.colno}: {exc.msg}")
 
     # 4. Final Validation of keys
-    required = {"summary", "peak", "crash", "trend", "highlights"}
+    required = {"summary", "trend", "highlights"}
     missing = required - data.keys()
     if missing:
         raise ValueError(f"Missing keys in Gemini response: {missing}")

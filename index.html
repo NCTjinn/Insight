@@ -206,7 +206,6 @@
       background: #ffffff !important;
       color: #111827 !important;
     }
-    /* Force paper-white on all inner elements (both themes) */
     .chart-card.is-capturing .card-inner,
     .chart-card.is-capturing .card-header,
     .chart-card.is-capturing .ai-summary-box {
@@ -216,7 +215,6 @@
     .chart-card.is-capturing .card-title,
     .chart-card.is-capturing .ai-summary-text { color: #111827 !important; }
     .chart-card.is-capturing .ai-label { color: #008f72 !important; }
-
     /* Suppress ALL ApexCharts interactive overlays during capture */
     .chart-card.is-capturing .apexcharts-tooltip,
     .chart-card.is-capturing .apexcharts-xaxistooltip,
@@ -224,8 +222,6 @@
     .chart-card.is-capturing .apexcharts-xcrosshairs,
     .chart-card.is-capturing .apexcharts-ycrosshairs,
     .chart-card.is-capturing .apexcharts-xcrosshairs-hidden,
-    .chart-card.is-capturing .apexcharts-selection-rect,
-    .chart-card.is-capturing .apexcharts-zoom-rect,
     .chart-card.is-capturing .apexcharts-active {
       display: none !important;
       opacity: 0 !important;
@@ -271,9 +267,7 @@
     }
 
     /* Force charts to render at full opacity in selection mode */
-    .selection-mode .chart-card {
-      opacity: 1 !important;
-    }
+    .selection-mode .chart-card { opacity: 1 !important; }
 
     /* Inner wrapper clips visual bg/radius but not positioned children */
     /* overflow:visible so tooltips/dropdowns inside card-actions are never clipped */
@@ -1015,7 +1009,6 @@ function buildCardDOM(entry){
    Returns { labels, values, raw } for both real and demo data.
    For real data, pairs xColumn (labels) with yColumn (values).
 ============================================================ */
-/* --- REFINED getChartData in index.html --- */
 function getChartData(entry) {
   const ds = state.parsedDataset;
   if (!ds) return { labels: [], values: [] };
@@ -1028,7 +1021,7 @@ function getChartData(entry) {
   let labels = xCol.labels;
   let values = yCol.values.map(v => typeof v === 'number' ? v : parseFloat(v) || 0);
 
-  // 1. Time range slicing (for date roles)
+  // 1. Time range slicing — for date x-axis columns
   if (xCol.role === 'date' && xCol.values.length > 0) {
     const maxDateInData = Math.max(...xCol.values.filter(v => v !== null));
     const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
@@ -1044,7 +1037,29 @@ function getChartData(entry) {
     }
   }
 
-  // 2. AGGREGATION: Group values by label to prevent chart clutter
+  // 2. Time range slicing — for categorical x-axis: filter rows using any date column
+  if (xCol.role === 'categorical') {
+    const dateCol = ds.columns.find(c => c.role === 'date');
+    if (dateCol && dateCol.values.length > 0) {
+      const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
+      const days = state.timeRange === 'CUSTOM' && state.customDateRange
+        ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
+        : (limits[state.timeRange] || Infinity);
+
+      if (days < Infinity) {
+        const maxDateInData = Math.max(...dateCol.values.filter(v => v !== null));
+        const cutoff = maxDateInData - (days * 86400000);
+        const idxs = dateCol.values
+          .map((v, i) => ({ v, i }))
+          .filter(({ v }) => v !== null && v >= cutoff)
+          .map(({ i }) => i);
+        labels = idxs.map(i => xCol.labels[i]);
+        values = idxs.map(i => (typeof yCol.values[i] === 'number' ? yCol.values[i] : parseFloat(yCol.values[i]) || 0));
+      }
+    }
+  }
+
+  // 3. AGGREGATION: Group values by label to prevent chart clutter
   const aggMap = new Map();
   labels.forEach((l, i) => {
     const val = values[i] || 0;
@@ -1134,8 +1149,7 @@ function updateAllCharts(){
       entry.apexInstance.updateSeries(values);
 
     } else if(entry.type === 'bar'){
-      // distributed:true bars need a full destroy+reinit whenever the
-      // category set changes — updateOptions alone silently no-ops.
+      // distributed:true bars cannot update-in-place when category count changes
       entry.apexInstance.destroy();
       entry.apexInstance = null;
       const el = document.getElementById('apex-' + entry.id);
@@ -1143,7 +1157,6 @@ function updateAllCharts(){
       initApexChart(entry);
 
     } else {
-      // line / area — safe to update in place
       entry.apexInstance.updateOptions({
         series: [{name: entry.yColumn || entry.title, data: values}],
         xaxis: { categories: labels }
@@ -1247,12 +1260,8 @@ async function generateSummary(id){
         throw new Error('No numeric statistics available for this column.');
       }
 
-      // Resolve x-axis labels at peak/trough index for context
+      // Resolve x-axis sample labels for context
       const xCol       = ds.columns.find(c=>c.name===entry.xColumn);
-      const peakIdx    = yStats.peak_index;
-      const troughIdx  = yStats.trough_index;
-      const peakLabel  = xCol && peakIdx   != null ? xCol.labels[peakIdx]   : null;
-      const troughLabel= xCol && troughIdx != null ? xCol.labels[troughIdx] : null;
       const xSample    = xCol ? xCol.labels.filter((_,i)=>i%Math.ceil(xCol.labels.length/20)===0).slice(0,20) : [];
 
       const body = {
@@ -1261,8 +1270,6 @@ async function generateSummary(id){
         x_column:     entry.xColumn,
         y_column:     entry.yColumn,
         y_stats:      yStats,
-        peak_label:   peakLabel,
-        trough_label: troughLabel,
         x_sample:     xSample,
       };
 
@@ -1285,13 +1292,7 @@ async function generateSummary(id){
 
       // Map backend schema to internal summary descriptor
       result = {
-        text:       formatSummaryHTML(data),
-        hasPeak:    data.peak?.detected  && data.peak.label  != null,
-        peakLabel:  data.peak?.label,
-        peakValue:  data.peak?.value,
-        hasCrash:   data.crash?.detected && data.crash.label != null,
-        crashLabel: data.crash?.label,
-        crashValue: data.crash?.value,
+        text:        formatSummaryHTML(data),
         fromBackend: true,
         highlights:  data.highlights || [],
       };
@@ -1315,7 +1316,7 @@ async function generateSummary(id){
   }
 }
 
-/** Render the Gemini response into HTML, highlighting peak/crash tokens */
+/** Render the Gemini response into HTML */
 function formatSummaryHTML(data){
   let text = data.summary || '';
 
@@ -1327,16 +1328,6 @@ function formatSummaryHTML(data){
     text += '<ul style="margin:8px 0 0 0;padding-left:16px;font-size:12px;color:var(--text-muted);">'
       + data.highlights.map(h=>`<li>${h}</li>`).join('')
       + '</ul>';
-  }
-
-  // Inline peak/crash badges
-  if(data.peak?.detected && data.peak.label){
-    const badge=`<span class="ai-highlight-peak">▲ Peak: ${data.peak.label}${data.peak.value!=null?' — '+Number(data.peak.value).toLocaleString():''}</span>`;
-    text = text.replace(data.peak.label, badge);
-  }
-  if(data.crash?.detected && data.crash.label){
-    const badge=`<span class="ai-highlight-crash">▼ Low: ${data.crash.label}${data.crash.value!=null?' — '+Number(data.crash.value).toLocaleString():''}</span>`;
-    text = text.replace(data.crash.label, badge);
   }
 
   return text;
@@ -1463,9 +1454,7 @@ function toggleCardSelection(id){state.selectedCards.has(id)?state.selectedCards
 function updateSelectionBar(){document.getElementById('selection-count').textContent=state.selectedCards.size+' selected';document.getElementById('selection-bar').classList.toggle('visible',state.selectedCards.size>0||state.selectionMode)}
 
 /* ============================================================
-   SHARED EXPORT HELPER
-   Prepares a card for capture (light theme, no hover overlays),
-   runs dom-to-image-more, then restores the original theme.
+   SHARED EXPORT HELPER — uses dom-to-image-more for proper SVG support
 ============================================================ */
 function safeFilename(title) {
   return (title || 'chart').replace(/[^a-z0-9_\-\s]/gi, '').trim().replace(/\s+/g, '-') || 'chart';
@@ -1474,10 +1463,8 @@ function safeFilename(title) {
 async function captureCard(card, entry) {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-  // 1. Enter capture mode
   card.classList.add('is-capturing');
 
-  // 2. Switch chart to light theme + kill animations
   if (entry?.apexInstance) {
     await entry.apexInstance.updateOptions({
       theme: { mode: 'light' },
@@ -1487,15 +1474,13 @@ async function captureCard(card, entry) {
     }, false, false);
   }
 
-  // 3. Dismiss any lingering hover/tooltip state
+  // Dismiss any active hover/tooltip state
   card.querySelectorAll('.apexcharts-canvas').forEach(el =>
     el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }))
   );
 
-  // 4. Short settle delay so SVG re-paints fully
   await new Promise(r => setTimeout(r, 350));
 
-  // 5. Capture with dom-to-image-more (proper SVG support)
   const scale = 2;
   const w = card.offsetWidth;
   const h = card.offsetHeight;
@@ -1514,7 +1499,6 @@ async function captureCard(card, entry) {
       }
     });
   } finally {
-    // 6. Always restore original theme
     card.classList.remove('is-capturing');
     if (entry?.apexInstance) {
       entry.apexInstance.updateOptions({
