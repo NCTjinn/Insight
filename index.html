@@ -201,8 +201,23 @@
     .chart-card.is-capturing {
       border-radius: 0 !important; 
       box-shadow: none !important;
-      border: 1px solid #30363d !important;
+      border: 1px solid #e5e7eb !important;
       transition: none !important;
+      background: #ffffff !important;
+      color: #111827 !important;
+    }
+
+    /* Suppress all ApexCharts interactive overlays during capture */
+    .chart-card.is-capturing .apexcharts-tooltip,
+    .chart-card.is-capturing .apexcharts-xaxistooltip,
+    .chart-card.is-capturing .apexcharts-yaxistooltip,
+    .chart-card.is-capturing .apexcharts-xcrosshairs,
+    .chart-card.is-capturing .apexcharts-ycrosshairs,
+    .chart-card.is-capturing .apexcharts-xcrosshairs-hidden,
+    .chart-card.is-capturing .apexcharts-selection-rect,
+    .chart-card.is-capturing .apexcharts-zoom-rect {
+      display: none !important;
+      opacity: 0 !important;
     }
 
     /* Hide interactive UI elements during capture */
@@ -221,27 +236,21 @@
       display: none !important;
     }
 
-    /* Force the background and text colors to the light-mode variables during capture */
-    [data-theme="dark"] .chart-card.is-capturing {
-      background: #ffffff !important; /* Force white background */
-      color: #111827 !important;     /* Force dark text */
-      border-color: #e5e7eb !important;
-    }
-
-    [data-theme="dark"] .chart-card.is-capturing .card-inner,
-    [data-theme="dark"] .chart-card.is-capturing .card-header,
-    [data-theme="dark"] .chart-card.is-capturing .ai-summary-box {
+    /* Force white background and dark text in capture mode (both themes) */
+    .chart-card.is-capturing .card-inner,
+    .chart-card.is-capturing .card-header,
+    .chart-card.is-capturing .ai-summary-box {
       background: #ffffff !important;
       color: #111827 !important;
     }
 
-    [data-theme="dark"] .chart-card.is-capturing .card-title,
-    [data-theme="dark"] .chart-card.is-capturing .ai-summary-text {
+    .chart-card.is-capturing .card-title,
+    .chart-card.is-capturing .ai-summary-text {
       color: #111827 !important;
     }
 
-    [data-theme="dark"] .chart-card.is-capturing .ai-label {
-      color: #008f72 !important; /* Use light-mode accent */
+    .chart-card.is-capturing .ai-label {
+      color: #008f72 !important;
     }
 
     /* Hide interactive elements and UNGENERATED summary buttons during export */
@@ -1028,12 +1037,12 @@ function buildCardDOM(entry){
 /* --- REFINED getChartData in index.html --- */
 function getChartData(entry) {
   const ds = state.parsedDataset;
-  if (!ds) return { labels: [], values: [], raw: { peak: null, crash: null } };
+  if (!ds) return { labels: [], values: [] };
 
   const xCol = ds.columns.find(c => c.name === entry.xColumn);
   const yCol = ds.columns.find(c => c.name === entry.yColumn);
   
-  if (!xCol || !yCol) return { labels: [], values: [], raw: { peak: null, crash: null } };
+  if (!xCol || !yCol) return { labels: [], values: [] };
 
   let labels = xCol.labels;
   let values = yCol.values.map(v => typeof v === 'number' ? v : parseFloat(v) || 0);
@@ -1064,18 +1073,7 @@ function getChartData(entry) {
   const finalLabels = Array.from(aggMap.keys());
   const finalValues = Array.from(aggMap.values());
 
-  const raw = { peak: null, crash: null };
-  if (finalValues.length > 0) {
-    const maxVal = Math.max(...finalValues);
-    const minVal = Math.min(...finalValues);
-    const maxIdx = finalValues.indexOf(maxVal);
-    const minIdx = finalValues.indexOf(minVal);
-    
-    if (maxIdx !== -1) raw.peak = { label: finalLabels[maxIdx], value: maxVal };
-    if (minIdx !== -1) raw.crash = { label: finalLabels[minIdx], value: minVal };
-  }
-
-  return { labels: finalLabels, values: finalValues, raw };
+  return { labels: finalLabels, values: finalValues };
 }
 
 function dateDiffDays(from,to){
@@ -1087,7 +1085,7 @@ function dateDiffDays(from,to){
 ============================================================ */
 function initApexChart(entry){
   const d=document.documentElement.getAttribute('data-theme')==='dark';
-  const{labels,values,raw}=getChartData(entry);
+  const{labels,values}=getChartData(entry);
   const ac='#00d4aa',ac2='#f59e0b',dng='#f85149',suc='#3fb950';
 
   // Smart value formatter: detect currency vs plain number vs large int
@@ -1134,31 +1132,37 @@ function initApexChart(entry){
       }
     };
   } else {
-    const pts=[];
-    if(raw.peak  &&labels.includes(raw.peak.label))  pts.push(mkAnn(raw.peak.label,  raw.peak.value,  suc,'▲ Peak'));
-    if(raw.crash &&labels.includes(raw.crash.label)) pts.push(mkAnn(raw.crash.label, raw.crash.value, dng,'▼ Low'));
     opts={...base,series:[{name:entry.yColumn||entry.title,data:values}],
       xaxis:{categories:labels,labels:{style:{fontSize:'11px',fontFamily:"'Outfit',sans-serif"},rotate:-30,rotateAlways:labels.length>12},axisBorder:{show:false},axisTicks:{show:false}},
       yaxis:{labels:{style:{fontSize:'11px',fontFamily:"'Outfit',sans-serif"},formatter:fmt}},
       colors:entry.type==='bar'?[ac,ac2,'#0099ff','#7c3aed',suc,dng]:[ac],
       fill:entry.type==='area'?{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:.4,opacityTo:.01,stops:[0,100]}}:{},
       plotOptions:entry.type==='bar'?{bar:{borderRadius:4,columnWidth:'55%',distributed:true}}:{},
-      annotations:{points:pts}};
+      annotations:{points:[]}};
   }
   const el=document.getElementById('apex-'+entry.id);if(!el)return;
   const apex=new ApexCharts(el,opts);apex.render();entry.apexInstance=apex;
-}
-
-function mkAnn(x,y,color,text){
-  return{x,y,marker:{size:6,fillColor:color,strokeColor:color},label:{text,style:{background:color+'22',color,fontFamily:"'Outfit',sans-serif",fontSize:'10px'}}};
 }
 
 function updateAllCharts(){
   state.charts.forEach(entry=>{
     if(!entry.apexInstance)return;
     const{labels,values}=getChartData(entry);
-    if(entry.type==='donut')entry.apexInstance.updateSeries(values);
-    else{entry.apexInstance.updateSeries([{data:values}]);entry.apexInstance.updateOptions({xaxis:{categories:labels}})}
+    if(entry.type==='donut'){
+      entry.apexInstance.updateSeries(values);
+    } else if(entry.type==='bar'){
+      // Bar charts with distributed:true need series + xaxis updated in one call
+      // or ApexCharts may not re-render correctly when the data length changes
+      const ac='#00d4aa',ac2='#f59e0b',dng='#f85149',suc='#3fb950';
+      entry.apexInstance.updateOptions({
+        series:[{name:entry.yColumn||entry.title,data:values}],
+        xaxis:{categories:labels},
+        colors:[ac,ac2,'#0099ff','#7c3aed',suc,dng]
+      },false,false);
+    } else {
+      entry.apexInstance.updateSeries([{name:entry.yColumn||entry.title,data:values}]);
+      entry.apexInstance.updateOptions({xaxis:{categories:labels}},false,false);
+    }
   });
 }
 
@@ -1366,7 +1370,7 @@ function applySummary(id, entry, sd){
     </div>
     <p class="ai-summary-text">${sd.text}</p>`;
   box.classList.add('visible');
-  if(sd.hasPeak || sd.hasCrash) addAnnotationsFromSummary(entry, sd);
+  if(sd.hasPeak || sd.hasCrash) { /* annotations disabled */ }
 }
 
 function clearSummary(id) {
@@ -1392,14 +1396,6 @@ function clearSummary(id) {
   if (entry.apexInstance) {
     entry.apexInstance.updateOptions({ annotations: { points: [] } }, false, false);
   }
-}
-
-function addAnnotationsFromSummary(entry,sd){
-  if(!entry.apexInstance||entry.type==='donut')return;
-  const pts=[];
-  if(sd.hasPeak  &&sd.peakLabel)  pts.push(mkAnn(sd.peakLabel,  sd.peakValue,  '#3fb950','▲ Peak'));
-  if(sd.hasCrash &&sd.crashLabel) pts.push(mkAnn(sd.crashLabel, sd.crashValue, '#f85149','▼ Low'));
-  entry.apexInstance.updateOptions({annotations:{points:pts}},false,false);
 }
 
 /* ============================================================
@@ -1505,6 +1501,9 @@ async function exportCardPDF(id) {
     }, false, false);
   }
 
+  // Dismiss any active tooltip / hover highlight before capture
+  card.querySelectorAll('.apexcharts-canvas').forEach(el => el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
+
   await new Promise(r => setTimeout(r, 400));
 
   try {
@@ -1550,6 +1549,9 @@ async function exportCardImage(id) {
       grid: { borderColor: '#e5e7eb' }
     }, false, false);
   }
+
+  // Dismiss any active tooltip / hover highlight before capture
+  card.querySelectorAll('.apexcharts-canvas').forEach(el => el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
 
   await new Promise(r => setTimeout(r, 400));
 
@@ -1608,7 +1610,7 @@ async function exportAllPDF() {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
   const pdfWidth = pdf.internal.pageSize.getWidth();
-  const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0d1117';
+  const isDarkGlobal = document.documentElement.getAttribute('data-theme') === 'dark';
 
   // Use for...of to ensure sequential processing (prevents blank pages)
   for (let i = 0; i < cards.length; i++) {
@@ -1617,15 +1619,23 @@ async function exportAllPDF() {
     
     card.classList.add('is-capturing');
     if (entry?.apexInstance) {
-      await entry.apexInstance.updateOptions({ chart: { animations: { enabled: false } } }, false, false);
+      await entry.apexInstance.updateOptions({
+        theme: { mode: 'light' },
+        chart: { animations: { enabled: false }, foreColor: '#6b7280' },
+        grid: { borderColor: '#e5e7eb' },
+        tooltip: { theme: 'light' }
+      }, false, false);
     }
 
-    await new Promise(r => setTimeout(r, 300)); // Delay for rendering stability
+    // Dismiss any lingering hover/tooltip state
+    card.querySelectorAll('.apexcharts-canvas').forEach(el => el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
+
+    await new Promise(r => setTimeout(r, 350)); // Delay for rendering stability
 
     const canvas = await html2canvas(card, {
       scale: 2,
       useCORS: true,
-      backgroundColor: bgColor
+      backgroundColor: '#ffffff'  // Always paper-white
     });
 
     const imgData = canvas.toDataURL('image/png', 1.0);
@@ -1634,10 +1644,15 @@ async function exportAllPDF() {
     if (i > 0) pdf.addPage();
     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
 
-    // Cleanup current card before moving to next
+    // Restore theme for this card before moving to next
     card.classList.remove('is-capturing');
     if (entry?.apexInstance) {
-      entry.apexInstance.updateOptions({ chart: { animations: { enabled: true } } }, false, false);
+      entry.apexInstance.updateOptions({
+        theme: { mode: isDarkGlobal ? 'dark' : 'light' },
+        chart: { animations: { enabled: true }, foreColor: isDarkGlobal ? '#7d8590' : '#6b7280' },
+        grid: { borderColor: isDarkGlobal ? '#21282f' : '#e5e7eb' },
+        tooltip: { theme: isDarkGlobal ? 'dark' : 'light' }
+      }, false, false);
     }
   }
 
