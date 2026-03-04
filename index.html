@@ -155,9 +155,6 @@
     .dataset-badge span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-    /* Demo banner */
-    .demo-banner{background:linear-gradient(90deg,var(--accent2-dim),rgba(245,158,11,.05));border-bottom:1px solid rgba(245,158,11,.2);padding:8px 32px;display:none;align-items:center;gap:10px;font-size:12px;color:var(--accent2)}
-
     /* Toolbar */
     .dash-toolbar{display:flex;align-items:center;justify-content:space-between;padding:16px 32px;gap:12px;flex-wrap:wrap}
     .dash-toolbar-left{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -326,7 +323,7 @@
   <div style="width:40px;height:40px;border:3px solid #30363d;border-top-color:#00d4aa;
     border-radius:50%;animation:spin .8s linear infinite;"></div>
   <div id="parse-status" style="font-size:13px;color:#7d8590;
-    max-width:420px;text-align:center;line-height:1.6;font-family:'Plus Jakarta Sans',sans-serif;"></div>
+    max-width:420px;text-align:center;line-height:1.6;font-family:'Outfit',sans-serif;"></div>
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
@@ -363,16 +360,11 @@
     <div class="form-row">
       <div class="form-group">
         <label class="input-label">X Axis</label>
-        <select class="select-field" id="modal-x-axis">
-          <option>Month</option><option>Category</option><option>Week</option><option>Quarter</option>
-        </select>
+        <select class="select-field" id="modal-x-axis"></select>
       </div>
       <div class="form-group">
         <label class="input-label">Y Axis</label>
-        <select class="select-field" id="modal-y-axis">
-          <option value="Revenue">Revenue</option><option value="Units">Units Sold</option>
-          <option value="Users">Active Users</option><option value="Satisfaction">Satisfaction Score</option>
-        </select>
+        <select class="select-field" id="modal-y-axis"></select>
       </div>
     </div>
     <div class="form-group" style="margin-top:12px">
@@ -458,11 +450,6 @@
 
       <div class="divider-text">or</div>
 
-      <button class="btn btn-secondary btn-full" onclick="loadDemoData()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Try with demo data
-      </button>
-
       <div class="privacy-badge">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="var(--success)"><polyline points="20 6 9 17 4 12"/></svg>
         No account required &nbsp;·&nbsp;
@@ -489,7 +476,7 @@
       <span class="topbar-wordmark">Insight</span>
       <div class="dataset-badge">
         <div class="dot"></div>
-        <span id="dataset-name">demo_data.xlsx</span>
+        <span id="dataset-name">No file loaded</span>
       </div>
     </div>
     <div class="topbar-right">
@@ -527,11 +514,6 @@
     </div>
   </header>
 
-  <div class="demo-banner" id="demo-banner">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-    DEMO MODE — Charts below use dummy / simulated data. Upload your own file to analyse real data.
-  </div>
-
   <div class="dash-toolbar">
     <div class="dash-toolbar-left">
       <!-- Preset ranges -->
@@ -553,16 +535,16 @@
           <div class="date-picker-row">
             <div class="date-picker-field">
               <label>Start date</label>
-              <input type="date" class="date-input" id="date-start" />
+              <input type="date" class="date-input" id="date-from" />
             </div>
             <div class="date-picker-field">
               <label>End date</label>
-              <input type="date" class="date-input" id="date-end" />
+              <input type="date" class="date-input" id="date-to" />
             </div>
           </div>
           <div class="date-picker-actions">
             <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="clearDateRange()">Clear</button>
-            <button class="btn btn-primary" style="font-size:12px;padding:5px 14px" onclick="applyDateRange()">Apply</button>
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 14px" onclick="applyCustomRange()">Apply</button>
           </div>
         </div>
       </div>
@@ -594,37 +576,9 @@
 'use strict';
 
 /* ============================================================
-   DUMMY / DEMO DATA
-   Used as fallback when the user clicks "Try with demo data".
-   All values are fabricated. Only DUMMY_DERIVED would be sent
-   to the backend in production.
-============================================================ */
-const DUMMY_MONTHLY_REVENUE={
-  labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-  values:[182000,138000,165000,193000,214000,231000,208000,245000,262000,287000,271000,253000],
-  peak:{label:'Oct',value:287000},crash:{label:'Feb',value:138000},
-};
-const DUMMY_CATEGORY_SALES={
-  labels:['Cloud Pro','Analytics','Enterprise','Starter','Marketplace','Support'],
-  values:[94000,71000,118000,42000,55000,28000],
-  peak:{label:'Enterprise',value:118000},
-};
-const DUMMY_WEEKLY_USERS={
-  labels:['W1','W2','W3','W4','W5','W6','W7','W8','W9','W10','W11','W12','W13','W14','W15','W16','W17','W18','W19','W20','W21','W22','W23','W24'],
-  values:[3200,3350,3100,3420,3600,3750,3920,4100,4050,3800,3650,3820,4200,4350,4500,4480,4620,4800,4900,5100,5050,4950,5200,5400],
-  peak:{label:'W24',value:5400},crash:{label:'W11',value:3650},
-};
-const DUMMY_DERIVED={
-  revenue: {mean:212417,median:219500,std:44820,min:138000,max:287000,trend:'upward',growth_rate:39.0},
-  category:{mean:68000, median:63000, std:31200,min:28000, max:118000,trend:'mixed'},
-  users:   {mean:4254,  median:4265,  std:674,  min:3100,  max:5400,  trend:'upward',growth_rate:68.8},
-};
-
-/* ============================================================
    STATE
 ============================================================ */
 const state={
-  isDemoMode:      false,
   parsedDataset:   null,   // { columns, rowCount, downsampled, fileName, suggestions, derivedData }
   charts:          [],
   selectedCards:   new Set(),
@@ -690,13 +644,11 @@ function dispatchToWorker(type, payload){
 ============================================================ */
 function onParseComplete(dataset){
   state.parsedDataset = dataset;
-  state.isDemoMode    = false;
 
   // ---- Console verification report ----
   logParsedDataset(dataset);
 
   document.getElementById('dataset-name').textContent = dataset.fileName;
-  document.getElementById('demo-banner').style.display = 'none';
 
   // Populate modal axis dropdowns with real column names
   populateAxisDropdowns(dataset.columns);
@@ -866,40 +818,20 @@ function handleSheetsURL(){
 
 function handleSessionLoad(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{loadSession(JSON.parse(ev.target.result))}catch{showToast('Invalid session file','error')}};r.readAsText(f)}
 
-function loadDemoData(){
-  state.isDemoMode=true;
-  state.parsedDataset=null;
-  document.getElementById('dataset-name').textContent='demo_data.xlsx';
-  // Reset modal dropdowns to static demo options
-  const xSel=document.getElementById('modal-x-axis');
-  const ySel=document.getElementById('modal-y-axis');
-  xSel.innerHTML='<option>Month</option><option>Category</option><option>Week</option><option>Quarter</option>';
-  ySel.innerHTML='<option value="Revenue">Revenue</option><option value="Units">Units Sold</option><option value="Users">Active Users</option><option value="Satisfaction">Satisfaction Score</option>';
-  initDashboard();showPage('dashboard');
-}
-
 /* ============================================================
    DASHBOARD INIT
 ============================================================ */
 function initDashboard(){
   state.charts=[];state.nextId=1;
   document.getElementById('chart-grid').innerHTML='';
-  document.getElementById('demo-banner').style.display=state.isDemoMode?'flex':'none';
 
-  if(state.isDemoMode || !state.parsedDataset){
-    // Demo mode: use hardcoded dummy charts
-    addChart({title:'Monthly Revenue 2024',      type:'line', dataset:'revenue'});
-    addChart({title:'Sales by Product Category', type:'bar',  dataset:'category'});
-    addChart({title:'Weekly Active Users',        type:'area', dataset:'users'});
-  } else {
-    // Real data: use suggestions from the worker
-    const suggs=state.parsedDataset.suggestions;
-    if(suggs.length===0){
-      showToast('No chart suggestions could be generated. Try adding one manually.','error');
-      return;
-    }
-    suggs.forEach(s=>addChart({title:s.title,type:s.type,xColumn:s.xColumn,yColumn:s.yColumn}));
+  // Real data: use suggestions from the worker
+  const suggs=state.parsedDataset.suggestions;
+  if(suggs.length===0){
+    showToast('No chart suggestions could be generated. Try adding one manually.','error');
+    return;
   }
+  suggs.forEach(s=>addChart({title:s.title,type:s.type,xColumn:s.xColumn,yColumn:s.yColumn}));
 }
 
 /* ============================================================
@@ -911,8 +843,6 @@ function addChart(opts){
     id,
     title:    opts.title||'New Chart',
     type:     opts.type||'line',
-    // Demo fallback keys
-    dataset:  opts.dataset||null,
     // Real data keys
     xColumn:  opts.xColumn||null,
     yColumn:  opts.yColumn||null,
@@ -1003,56 +933,57 @@ function buildCardDOM(entry){
    Returns { labels, values, raw } for both real and demo data.
    For real data, pairs xColumn (labels) with yColumn (values).
 ============================================================ */
-function getChartData(entry){
+/* --- REFINED getChartData in index.html --- */
+function getChartData(entry) {
   const ds = state.parsedDataset;
+  if (!ds) return { labels: [], values: [], raw: { peak: null, crash: null } };
 
-  // ---- REAL DATA PATH ----
-  if(ds && !state.isDemoMode && entry.xColumn && entry.yColumn){
-    const xCol = ds.columns.find(c=>c.name===entry.xColumn);
-    const yCol = ds.columns.find(c=>c.name===entry.yColumn);
-    if(!xCol||!yCol) return getDemoChartData(entry.dataset);
+  const xCol = ds.columns.find(c => c.name === entry.xColumn);
+  const yCol = ds.columns.find(c => c.name === entry.yColumn);
+  
+  if (!xCol || !yCol) return { labels: [], values: [], raw: { peak: null, crash: null } };
 
-    let labels = xCol.labels;
-    let values = yCol.values.map(v=>typeof v==='number'?v:parseFloat(v)||0);
+  let labels = xCol.labels;
+  let values = yCol.values.map(v => typeof v === 'number' ? v : parseFloat(v) || 0);
 
-    // Time range slice (only meaningful for date x-axis)
-    if(xCol.role==='date'){
-      const limits={'1M':30,'3M':90,'6M':180,'1Y':365,'ALL':Infinity};
-      const days = state.timeRange==='CUSTOM'&&state.customDateRange
-        ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
-        : (limits[state.timeRange]||Infinity);
+  // 1. Time range slicing (for date roles)
+  if (xCol.role === 'date' && xCol.values.length > 0) {
+    const maxDateInData = Math.max(...xCol.values.filter(v => v !== null));
+    const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
+    const days = state.timeRange === 'CUSTOM' && state.customDateRange
+      ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
+      : (limits[state.timeRange] || Infinity);
 
-      if(days < Infinity){
-        const cutoff = Date.now() - days*86400000;
-        const idxs   = xCol.values.map((v,i)=>({v,i})).filter(({v})=>v && v>=cutoff).map(({i})=>i);
-        labels = idxs.map(i=>xCol.labels[i]);
-        values = idxs.map(i=>yCol.values[i]||0);
-      }
+    if (days < Infinity) {
+      const cutoff = maxDateInData - (days * 86400000);
+      const idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= cutoff).map(({ i }) => i);
+      labels = idxs.map(i => xCol.labels[i]);
+      values = idxs.map(i => yCol.values[i] || 0);
     }
-
-    // Derive peak/crash from real stats
-    const raw = { peak:null, crash:null };
-    if(yCol.stats){
-      const s = yCol.stats;
-      if(s.peakIdx   < labels.length) raw.peak  = {label:labels[s.peakIdx],   value:values[s.peakIdx]};
-      if(s.troughIdx < labels.length) raw.crash = {label:labels[s.troughIdx], value:values[s.troughIdx]};
-    }
-
-    return { labels, values, raw };
   }
 
-  // ---- DEMO FALLBACK PATH ----
-  return getDemoChartData(entry.dataset);
-}
+  // 2. AGGREGATION: Group values by label to prevent chart clutter
+  const aggMap = new Map();
+  labels.forEach((l, i) => {
+    const val = values[i] || 0;
+    aggMap.set(l, (aggMap.get(l) || 0) + val);
+  });
+  
+  const finalLabels = Array.from(aggMap.keys());
+  const finalValues = Array.from(aggMap.values());
 
-function getDemoChartData(dataset){
-  const raw = dataset==='revenue' ? DUMMY_MONTHLY_REVENUE
-            : dataset==='category'? DUMMY_CATEGORY_SALES
-            : DUMMY_WEEKLY_USERS;
-  if(dataset==='category') return{labels:[...raw.labels],values:[...raw.values],raw};
-  const limits={'1M':1,'3M':3,'6M':6,'1Y':12,'ALL':9999};
-  const n=limits[state.timeRange]||12;
-  return{labels:raw.labels.slice(-Math.min(n,raw.labels.length)),values:raw.values.slice(-Math.min(n,raw.values.length)),raw};
+  const raw = { peak: null, crash: null };
+  if (finalValues.length > 0) {
+    const maxVal = Math.max(...finalValues);
+    const minVal = Math.min(...finalValues);
+    const maxIdx = finalValues.indexOf(maxVal);
+    const minIdx = finalValues.indexOf(minVal);
+    
+    if (maxIdx !== -1) raw.peak = { label: finalLabels[maxIdx], value: maxVal };
+    if (minIdx !== -1) raw.crash = { label: finalLabels[minIdx], value: minVal };
+  }
+
+  return { labels: finalLabels, values: finalValues, raw };
 }
 
 function dateDiffDays(from,to){
@@ -1068,39 +999,55 @@ function initApexChart(entry){
   const ac='#00d4aa',ac2='#f59e0b',dng='#f85149',suc='#3fb950';
 
   // Smart value formatter: detect currency vs plain number vs large int
-  const isRevEntry = entry.dataset==='revenue'||entry.dataset==='category'
-    || (entry.yColumn && /revenue|sales|amount|price|cost|profit|income/i.test(entry.yColumn));
+  const isRevEntry = entry.yColumn && /revenue|sales|amount|price|cost|profit|income/i.test(entry.yColumn);
   const fmt = v => {
     if(isRevEntry) return '$'+(v>=1e6?(v/1e6).toFixed(1)+'M':v>=1000?(v/1000).toFixed(0)+'K':v);
     return v>=1000?(v/1000).toFixed(1)+'K':String(v);
   };
 
   const base={
-    chart:{type:entry.type==='donut'?'donut':entry.type,background:'transparent',foreColor:d?'#7d8590':'#6b7280',toolbar:{show:false},animations:{enabled:true,speed:500},fontFamily:"'Plus Jakarta Sans',sans-serif",height:240},
+    chart:{type:entry.type==='donut'?'donut':entry.type,background:'transparent',foreColor:d?'#7d8590':'#6b7280',toolbar:{show:false},animations:{enabled:true,speed:500},fontFamily:"'Outfit',sans-serif",height:240},
     theme:{mode:d?'dark':'light'},
     grid:{borderColor:d?'#21282f':'#e5e7eb',strokeDashArray:3,padding:{left:10,right:10,top:0,bottom:0}},
     stroke:{curve:'smooth',width:2},dataLabels:{enabled:false},legend:{show:false},
-    tooltip:{theme:d?'dark':'light',style:{fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'12px'},y:{formatter:fmt}},
+    tooltip:{theme:d?'dark':'light',style:{fontFamily:"'Outfit',sans-serif",fontSize:'12px'},y:{formatter:fmt}},
   };
 
   let opts;
-  if(entry.type==='donut'){
-    const donutLabels = entry.xColumn && state.parsedDataset
-      ? (()=>{
-          const xc=state.parsedDataset.columns.find(c=>c.name===entry.xColumn);
-          return xc ? xc.labels.slice(0, values.length) : labels;
-        })()
-      : labels;
-    opts={...base,series:values,labels:donutLabels,colors:[ac,ac2,'#0099ff','#7c3aed',suc,dng],
-      plotOptions:{pie:{donut:{size:'68%',labels:{show:true,total:{show:true,label:'Total',color:d?'#7d8590':'#6b7280',fontSize:'12px',fontFamily:"'Plus Jakarta Sans',sans-serif",formatter:w=>{const t=w.globals.seriesTotals.reduce((a,b)=>a+b,0);return isRevEntry?'$'+(t>=1000?(t/1000).toFixed(0)+'K':t):t.toLocaleString();}}}}}}};
-    delete opts.stroke;delete opts.grid;
+  if(entry.type === 'donut') {
+    // Extract specific categorical counts for the donut
+    const donutData = getChartData(entry);
+    opts = {
+      ...base,
+      series: donutData.values,
+      labels: donutData.labels,
+      colors: [ac, ac2, '#0099ff', '#7c3aed', suc, dng],
+      plotOptions: {
+        pie: {
+          donut: {
+            size: '68%',
+            labels: {
+              show: true,
+              total: {
+                show: true,
+                label: 'Total',
+                formatter: w => {
+                  const t = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
+                  return t >= 1000 ? (t / 1000).toFixed(1) + 'K' : t.toLocaleString();
+                }
+              }
+            }
+          }
+        }
+      }
+    };
   } else {
     const pts=[];
     if(raw.peak  &&labels.includes(raw.peak.label))  pts.push(mkAnn(raw.peak.label,  raw.peak.value,  suc,'▲ Peak'));
     if(raw.crash &&labels.includes(raw.crash.label)) pts.push(mkAnn(raw.crash.label, raw.crash.value, dng,'▼ Low'));
     opts={...base,series:[{name:entry.yColumn||entry.title,data:values}],
-      xaxis:{categories:labels,labels:{style:{fontSize:'11px',fontFamily:"'Plus Jakarta Sans',sans-serif"},rotate:-30,rotateAlways:labels.length>12},axisBorder:{show:false},axisTicks:{show:false}},
-      yaxis:{labels:{style:{fontSize:'11px',fontFamily:"'Plus Jakarta Sans',sans-serif"},formatter:fmt}},
+      xaxis:{categories:labels,labels:{style:{fontSize:'11px',fontFamily:"'Outfit',sans-serif"},rotate:-30,rotateAlways:labels.length>12},axisBorder:{show:false},axisTicks:{show:false}},
+      yaxis:{labels:{style:{fontSize:'11px',fontFamily:"'Outfit',sans-serif"},formatter:fmt}},
       colors:entry.type==='bar'?[ac,ac2,'#0099ff','#7c3aed',suc,dng]:[ac],
       fill:entry.type==='area'?{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:.4,opacityTo:.01,stops:[0,100]}}:{},
       plotOptions:entry.type==='bar'?{bar:{borderRadius:4,columnWidth:'55%',distributed:true}}:{},
@@ -1111,7 +1058,7 @@ function initApexChart(entry){
 }
 
 function mkAnn(x,y,color,text){
-  return{x,y,marker:{size:6,fillColor:color,strokeColor:color},label:{text,style:{background:color+'22',color,fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:'10px'}}};
+  return{x,y,marker:{size:6,fillColor:color,strokeColor:color},label:{text,style:{background:color+'22',color,fontFamily:"'Outfit',sans-serif",fontSize:'10px'}}};
 }
 
 function updateAllCharts(){
@@ -1131,19 +1078,37 @@ function setTimeRange(btn,range){
   btn.classList.add('active');state.timeRange=range;state.customDateRange=null;
   updateAllCharts();closeDatePopover();
 }
-function toggleDatePopover(){document.getElementById('date-popover').classList.toggle('open')}
-function closeDatePopover(){document.getElementById('date-popover').classList.remove('open')}
+function toggleDatePicker() {
+  document.getElementById('date-picker-popover').classList.toggle('open');
+}
+function closeDatePopover() {
+  document.getElementById('date-picker-popover').classList.remove('open');
+}
 function applyCustomRange(){
   const from=document.getElementById('date-from').value;
   const to=document.getElementById('date-to').value;
-  if(!from||!to||from>to){showToast('Please select a valid date range','error');return;}
-  state.timeRange='CUSTOM';state.customDateRange={from,to};
-  document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('btn-custom').classList.add('active');
-  updateAllCharts();closeDatePopover();
-  showToast('Range applied: '+from+' → '+to,'success');
+
+  if (!from || !to || from > to) {
+    showToast('Please select a valid date range', 'error');
+    return;
+  }
+
+  state.timeRange='CUSTOM';
+  state.customDateRange={from,to};
+
+  document.getElementById('date-range-label').textContent = `${from} - ${to}`;
+  document.getElementById('date-range-trigger').classList.add('has-value');
+  document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+
+  updateAllCharts();
+  closeDatePopover();
+  showToast('Range applied','success');
 }
-document.addEventListener('click',e=>{if(!document.getElementById('time-range-wrap')?.contains(e.target))closeDatePopover()});
+document.addEventListener('click', e => {
+  if (!document.getElementById('date-range-wrap')?.contains(e.target)) {
+    closeDatePopover();
+  }
+});
 
 /* ============================================================
    CHART TITLE EDITING
@@ -1165,20 +1130,13 @@ function toggleCardSize(id){
 /* ============================================================
    AI SUMMARY
    Calls the Cloud Run backend → Gemini API when a real dataset
-   is loaded. Falls back to dummy summaries in demo mode.
+   is loaded.
    Set BACKEND_URL to your deployed Cloud Run service URL.
 ============================================================ */
 
 // ── Replace this with your Cloud Run service URL after deployment ──────────────
 // e.g. 'https://insight-backend-abc123-as.a.run.app'
 const BACKEND_URL = 'https://insight-backend-54324702893.asia-southeast1.run.app';   // empty = backend not yet deployed
-
-// Demo-mode fallback summaries (used when BACKEND_URL is empty or in demo mode)
-const DUMMY_SUMMARIES={
-  revenue:{text:`Revenue grew <strong>39% year-over-year</strong>, with consistent upward momentum from April onwards. A notable trough occurred in February at $138K, likely driven by post-holiday spending contraction. The trajectory recovered strongly, hitting a <span class="ai-highlight-peak">▲ Peak: Oct — $287K</span> in October. Q4 shows slight normalisation but maintains levels well above H1 averages.`,hasPeak:true,peakLabel:'Oct',peakValue:287000,hasCrash:true,crashLabel:'Feb',crashValue:138000},
-  category:{text:`Enterprise leads all product lines at <strong>$118K</strong>, accounting for 29.1% of total Q4 revenue. Cloud Pro and Analytics together represent a further 40.6%. The Starter tier at $42K suggests limited freemium conversion. <span class="ai-highlight-peak">▲ Peak: Enterprise — $118K</span> warrants continued investment.`,hasPeak:true,peakLabel:'Enterprise',peakValue:118000,hasCrash:false},
-  users:{text:`Weekly Active Users rose <strong>68.8%</strong> from 3,200 (W1) to 5,400 (W24). A minor <span class="ai-highlight-crash">▼ Dip: W11 — 3,650</span> in Week 11 warrants investigation. Recovery was swift, reaching a <span class="ai-highlight-peak">▲ Peak: W24 — 5,400</span>. H2 acceleration may reflect improved retention.`,hasPeak:true,peakLabel:'W24',peakValue:5400,hasCrash:true,crashLabel:'W11',crashValue:3650},
-};
 
 // In-memory cache: chartId → summary response (avoids repeated API calls)
 const _summaryCache = {};
@@ -1199,7 +1157,7 @@ async function generateSummary(id){
     let result;
 
     // ── REAL BACKEND PATH ──────────────────────────────────────────────────────
-    if(BACKEND_URL && !state.isDemoMode && state.parsedDataset && entry.yColumn){
+    if(BACKEND_URL && state.parsedDataset && entry.yColumn){
       const ds      = state.parsedDataset;
       const yStats  = ds.derivedData[entry.yColumn];
 
@@ -1256,24 +1214,22 @@ async function generateSummary(id){
         highlights:  data.highlights || [],
       };
     }
-    // ── DEMO / FALLBACK PATH ───────────────────────────────────────────────────
     else {
-      // Simulate latency so the UX feels natural
-      await new Promise(r=>setTimeout(r, 1600+Math.random()*700));
-      result = DUMMY_SUMMARIES[entry.dataset] || DUMMY_SUMMARIES.revenue;
-      if(!result.fromBackend) result = {...result, fromBackend:false};
+      throw new Error('No backend URL configured and no dataset loaded.');
     }
 
     _summaryCache[id] = result;
     applySummary(id, entry, result);
 
-  } catch(err){
-    console.error('[Insight] generateSummary error:', err);
-    document.getElementById('ai-skeleton-'+id).classList.remove('visible');
-    document.getElementById('ai-error-'+id).classList.add('visible');
-    document.getElementById('ai-btn-'+id).style.display='flex';
-    // Dashboard survives — only this card shows the error
-    showToast('AI summary failed: ' + err.message, 'error');
+  } catch (err) {
+    console.error('[Insight] AI error:', err);
+    document.getElementById('ai-skeleton-' + id).classList.remove('visible');
+    document.getElementById('ai-error-' + id).classList.add('visible');
+    
+    // Re-enable the button so the user can try again 
+    const btn = document.getElementById('ai-btn-' + id);
+    btn.style.display = 'flex';
+    btn.innerHTML = '<span class="ai-icon">↻</span> Retry AI summary';
   }
 }
 
@@ -1309,8 +1265,8 @@ function applySummary(id, entry, sd){
   entry.summaryText   = sd.text;
   entry.summaryLoaded = true;
 
-  const label = sd.fromBackend ? 'AI Analysis — Gemini' : (state.isDemoMode ? 'AI Analysis — Demo' : 'AI Analysis — Stats');
-  const box   = document.getElementById('ai-summary-'+id);
+  const label = sd.fromBackend ? 'AI Analysis — Gemini' : 'Data Analysis — Statistics';
+  const box = document.getElementById('ai-summary-' + id);
   box.innerHTML=`
     <div class="ai-summary-header">
       <div class="ai-label"><div class="ai-label-dot"></div> ${label}</div>
@@ -1339,14 +1295,9 @@ function addAnnotationsFromSummary(entry,sd){
 /* ============================================================
    AUTO GENERATE
 ============================================================ */
-const AUTO_CFGS=[
-  {title:'Revenue Overview',      type:'line',  dataset:'revenue'},
-  {title:'Category Distribution', type:'donut', dataset:'category'},
-  {title:'User Growth Trend',     type:'area',  dataset:'users'},
-];
 let autoIdx=0;
 function autoGenerateChart(){
-  if(!state.isDemoMode&&state.parsedDataset){
+  if(state.parsedDataset){
     // Cycle through real column combinations
     const ds=state.parsedDataset;
     const nums=ds.columns.filter(c=>c.role==='numeric');
@@ -1359,10 +1310,9 @@ function autoGenerateChart(){
       showToast('Chart auto-generated','success');
       return;
     }
+  } else {
+     showToast('Please upload a file first to use Auto Generate.', 'error');
   }
-  const cfg=AUTO_CFGS[autoIdx++%AUTO_CFGS.length];
-  addChart({...cfg,title:cfg.title+' (auto)'});
-  showToast('Chart auto-generated','success');
 }
 
 /* ============================================================
@@ -1376,28 +1326,49 @@ function addChartFromModal(){
   const xCol=document.getElementById('modal-x-axis').value;
   const yCol=document.getElementById('modal-y-axis').value;
 
-  if(!state.isDemoMode&&state.parsedDataset){
-    // Real data mode
+  if(state.parsedDataset){
     addChart({title:title||`${yCol} by ${xCol}`,type:state.selectedChartType,xColumn:xCol,yColumn:yCol});
+    closeModal();
+    document.getElementById('modal-title').value='';
+    showToast('Chart added','success');
   } else {
-    // Demo mode
-    const dsMap={Revenue:'revenue',Units:'category',Users:'users',Satisfaction:'users'};
-    addChart({title:title||`${yCol} by ${xCol}`,type:state.selectedChartType,dataset:dsMap[yCol]||'revenue'});
+    showToast('Upload a file to create custom charts.', 'error');
   }
-  closeModal();document.getElementById('modal-title').value='';
-  showToast('Chart added','success');
 }
 
 /* ============================================================
    DRAG TO REORDER
 ============================================================ */
+function syncStateOrder() {
+  const currentIds = Array.from(document.getElementById('chart-grid').children)
+    .map(el => el.getAttribute('data-id'));
+    
+  state.charts.sort((a, b) => currentIds.indexOf(a.id) - currentIds.indexOf(b.id));
+}
+
 let dragSrcId=null;
 function setupCardDrag(card){
   card.addEventListener('dragstart',e=>{dragSrcId=card.getAttribute('data-id');card.classList.add('dragging');e.dataTransfer.effectAllowed='move'});
   card.addEventListener('dragend',()=>{card.classList.remove('dragging');document.querySelectorAll('.chart-card').forEach(c=>c.classList.remove('drag-target'));dragSrcId=null});
   card.addEventListener('dragover',e=>{e.preventDefault();if(card.getAttribute('data-id')!==dragSrcId)card.classList.add('drag-target')});
   card.addEventListener('dragleave',()=>card.classList.remove('drag-target'));
-  card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('drag-target');if(!dragSrcId||card.getAttribute('data-id')===dragSrcId)return;const grid=document.getElementById('chart-grid'),src=document.getElementById(dragSrcId),kids=Array.from(grid.children);if(kids.indexOf(src)<kids.indexOf(card))grid.insertBefore(src,card.nextSibling);else grid.insertBefore(src,card)});
+  card.addEventListener('drop', e => {
+    e.preventDefault();
+    card.classList.remove('drag-target');
+    if(!dragSrcId || card.getAttribute('data-id') === dragSrcId) return;
+    
+    const grid = document.getElementById('chart-grid');
+    const src = document.getElementById(dragSrcId);
+    const kids = Array.from(grid.children);
+    
+    if(kids.indexOf(src) < kids.indexOf(card)) {
+      grid.insertBefore(src, card.nextSibling);
+    } else {
+      grid.insertBefore(src, card);
+    }
+    
+    syncStateOrder();
+  });
 }
 
 /* ============================================================
@@ -1411,7 +1382,27 @@ function updateSelectionBar(){document.getElementById('selection-count').textCon
 /* ============================================================
    EXPORT
 ============================================================ */
-async function exportCardPDF(id){const card=document.getElementById(id);if(!card)return;showToast('Preparing PDF…','success');try{const canvas=await html2canvas(card,{backgroundColor:null,scale:2});const{jsPDF}=window.jspdf;const pdf=new jsPDF({orientation:'landscape',unit:'mm'});const pw=pdf.internal.pageSize.getWidth()-20;pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,pw,pw/(canvas.width/canvas.height));pdf.save('insight-chart.pdf');showToast('PDF exported','success')}catch{showToast('Export failed','error')}}
+async function exportCardPDF(id) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  showToast('Generating PDF...', 'success');
+  
+  const canvas = await html2canvas(card, {
+    scale: 2, // Higher resolution for print 
+    useCORS: true,
+    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
+  });
+  
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('l', 'mm', 'a4');
+  const imgData = canvas.toDataURL('image/png');
+  const imgProps = pdf.getImageProperties(imgData);
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+  
+  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+  pdf.save(`${id}-export.pdf`);
+}
 async function exportCardImage(id){const card=document.getElementById(id);if(!card)return;showToast('Preparing image…','success');try{const canvas=await html2canvas(card,{backgroundColor:null,scale:2});const a=document.createElement('a');a.download='insight-chart.png';a.href=canvas.toDataURL('image/png');a.click();showToast('Image exported','success')}catch{showToast('Export failed','error')}}
 async function exportSelected(fmt){for(const id of state.selectedCards){if(fmt==='pdf')await exportCardPDF(id);else await exportCardImage(id)}clearSelection()}
 async function exportAllPDF(){showToast('Exporting all charts…','success');try{const{jsPDF}=window.jspdf;const pdf=new jsPDF({orientation:'landscape',unit:'mm'});const cards=document.querySelectorAll('.chart-card');for(let i=0;i<cards.length;i++){const canvas=await html2canvas(cards[i],{backgroundColor:null,scale:2});const pw=pdf.internal.pageSize.getWidth()-20;if(i>0)pdf.addPage();pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,pw,pw/(canvas.width/canvas.height))}pdf.save('insight-dashboard.pdf');showToast('Dashboard PDF exported','success')}catch{showToast('Export failed','error')}}
@@ -1421,11 +1412,16 @@ async function exportAllImages(){for(const c of document.querySelectorAll('.char
    SESSION SAVE / LOAD
 ============================================================ */
 function saveSession(){
-  const session={
-    version:'1.0',savedAt:new Date().toISOString(),
-    datasetName:document.getElementById('dataset-name').textContent,
-    charts:state.charts.map(c=>({id:c.id,title:c.title,type:c.type,dataset:c.dataset,xColumn:c.xColumn,yColumn:c.yColumn,summaryText:c.summaryText})),
-    derivedData:state.parsedDataset?state.parsedDataset.derivedData:DUMMY_DERIVED,
+  const session = {
+    version: '1.0',
+    savedAt: new Date().toISOString(),
+    datasetName: document.getElementById('dataset-name').textContent,
+    // Store the full dataset structure for full functionality on reload
+    parsedDataset: state.parsedDataset, 
+    charts: state.charts.map(c => ({
+      id: c.id, title: c.title, type: c.type, 
+      xColumn: c.xColumn, yColumn: c.yColumn, summaryText: c.summaryText
+    })),
   };
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([JSON.stringify(session,null,2)],{type:'application/json'}));
@@ -1433,14 +1429,21 @@ function saveSession(){
   showToast('Session saved','success');
 }
 function loadSession(session){
-  if(!session.version||!session.charts){showToast('Invalid session file','error');return;}
-  state.isDemoMode=false;state.parsedDataset=null;
-  document.getElementById('dataset-name').textContent=session.datasetName||'session.json';
-  document.getElementById('demo-banner').style.display='none';
-  document.getElementById('chart-grid').innerHTML='';
-  state.charts=[];state.nextId=1;
+  if(!session.version || !session.charts){showToast('Invalid session file','error'); return;}
+  
+  // Restore the dataset state
+  state.parsedDataset = session.parsedDataset;
+  if(state.parsedDataset) {
+    populateAxisDropdowns(state.parsedDataset.columns);
+  }
+
+  document.getElementById('dataset-name').textContent = session.datasetName || 'session.json';
+  document.getElementById('chart-grid').innerHTML = '';
+  state.charts = []; 
+  state.nextId = 1;
+
   session.charts.forEach(cfg=>{
-    const entry=addChart({title:cfg.title,type:cfg.type,dataset:cfg.dataset,xColumn:cfg.xColumn,yColumn:cfg.yColumn});
+    const entry=addChart({title:cfg.title,type:cfg.type,xColumn:cfg.xColumn,yColumn:cfg.yColumn});
     if(cfg.summaryText){
       entry.summaryText=cfg.summaryText;entry.summaryLoaded=true;
       requestAnimationFrame(()=>{

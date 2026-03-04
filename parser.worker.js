@@ -108,13 +108,28 @@ function processRawRows(rows, fileName) {
   const originalRowCount = dataRows.length;
   progress(`${originalRowCount} data row(s) found.`);
 
+  // --- 2.5 Sort by Date (if a date column exists) ---
+  const dateColIdx = headers.findIndex(h => {
+    const firstVal = dataRows[0][headers.indexOf(h)];
+    return parseFlexibleDate(firstVal) !== null;
+  });
+
+  if (dateColIdx !== -1) {
+    progress(`Sorting dataset by column: "${headers[dateColIdx]}"...`);
+    dataRows.sort((a, b) => {
+      const da = parseFlexibleDate(a[dateColIdx]);
+      const db = parseFlexibleDate(b[dateColIdx]);
+      return (da?.getTime() || 0) - (db?.getTime() || 0);
+    });
+  }
+
   // --- 3. Downsample if needed ---
   const DOWNSAMPLE_THRESHOLD = 1000;
   let downsampled = false;
   if (originalRowCount > DOWNSAMPLE_THRESHOLD) {
-    progress(`Dataset exceeds ${DOWNSAMPLE_THRESHOLD} rows — downsampling to ${DOWNSAMPLE_THRESHOLD} rows using uniform sampling…`);
-    dataRows = uniformSample(dataRows, DOWNSAMPLE_THRESHOLD);
-    downsampled = true;
+  progress(`Downsampling ${originalRowCount} rows to ${DOWNSAMPLE_THRESHOLD} using LTTB for visual fidelity...`);
+  dataRows = downsampleLTTB(dataRows, DOWNSAMPLE_THRESHOLD);
+  downsampled = true;
   }
 
   // --- 4. Build per-column raw value arrays ---
@@ -160,16 +175,17 @@ function analyseColumn({ name, rawValues }) {
   const role = detectRole(rawValues);
 
   if (role === 'numeric') {
-    const nums = rawValues
-      .map(v => {
-        if (typeof v === 'number') return v;
-        const s = String(v).replace(/[$,%\s]/g, '');
-        return s !== '' ? parseFloat(s) : NaN;
-      })
-      .filter(n => !isNaN(n) && isFinite(n));
+    const nums = rawValues.map(v => {
+      if (typeof v === 'number') return v;
+      if (v === '' || v === null || v === undefined) return null;
+      const s = String(v).replace(/[$,%\s]/g, '');
+      const n = parseFloat(s);
+      return isNaN(n) ? null : n; // Return null instead of 0 for non-parsable values to avoid skewing stats
+    });
 
-    const stats = computeNumericStats(nums);
-    // Labels: index strings by default; caller can pair with a date/cat column
+    // Compute stats only on non-empty values for better accuracy
+    const validNums = nums.filter(v => v !== null);
+    const stats = computeNumericStats(validNums);
     const labels = rawValues.map((_, i) => String(i + 1));
 
     return { name, role, values: nums, labels, stats };
@@ -197,8 +213,14 @@ function analyseColumn({ name, rawValues }) {
   return {
     name,
     role,
-    values: rawValues.map(v => String(v ?? '').trim()),
-    labels: rawValues.map(v => String(v ?? '').trim()),
+    values: rawValues.map(v => {
+      const s = String(v ?? '').trim();
+      return s === '' ? '(Empty)' : s;
+    }),
+    labels: rawValues.map(v => {
+      const s = String(v ?? '').trim();
+      return s === '' ? '(Empty)' : s;
+    }),
     categories,
     stats: null,
   };
@@ -269,58 +291,138 @@ function formatDateLabel(d) {
 ============================================================ */
 
 function computeNumericStats(nums) {
-  if (nums.length === 0) return null;
+  // 1. Filter to ensure we only operate on real numbers
+  const cleanNums = nums.filter(v => v !== null && !isNaN(v) && typeof v === 'number');
+  
+  if (cleanNums.length === 0) return null;
 
-  const sorted = [...nums].sort((a, b) => a - b);
-  const n      = nums.length;
-  const sum    = nums.reduce((s, v) => s + v, 0);
+  const sorted = [...cleanNums].sort((a, b) => a - b);
+  const n      = cleanNums.length;
+  const sum    = cleanNums.reduce((s, v) => s + v, 0);
+  
+  // 2. Basic Descriptive Statistics
   const mean   = sum / n;
   const median = n % 2 === 0
     ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2
     : sorted[Math.floor(n / 2)];
-  const variance = nums.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / n;
-  const std    = Math.sqrt(variance);
-  const min    = sorted[0];
-  const max    = sorted[n - 1];
+  
+  const variance = cleanNums.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / n;
+  const std      = Math.sqrt(variance);
+  const min      = sorted[0];
+  const max      = sorted[n - 1];
 
-  // Positions for peak and trough
+  // 3. Peak and Trough Indices 
+  // Find the index in the ORIGINAL 'nums' array to maintain alignment with X-axis labels 
   const peakIdx   = nums.indexOf(max);
   const troughIdx = nums.indexOf(min);
 
-  // Simple linear regression slope (for trend detection)
+  // 4. Linear Regression for Trend Analysis
+  // Note: Using 'cleanNums' indices (0 to n-1) for the regression slope
   const xMean = (n - 1) / 2;
-  const ssX   = nums.reduce((s, _, x) => s + Math.pow(x - xMean, 2), 0);
+  const ssX   = cleanNums.reduce((s, _, x) => s + Math.pow(x - xMean, 2), 0);
+  
+  // Slope calculation: (sum of (x - xMean) * (y - yMean)) / ssX
   const slope = ssX === 0 ? 0
-    : nums.reduce((s, y, x) => s + (x - xMean) * (y - mean), 0) / ssX;
+    : cleanNums.reduce((s, y, x) => s + (x - xMean) * (y - mean), 0) / ssX;
 
-  // Trend: slope relative to mean magnitude
+  // 5. Trend Classification 
+  // Threshold (0.005) determines if the movement is significant relative to the mean
   const relSlope = mean !== 0 ? Math.abs(slope / mean) : 0;
   const trend = relSlope < 0.005 ? 'stable'
               : slope > 0        ? 'upward'
               :                    'downward';
 
-  // Growth rate: (last - first) / |first| × 100
-  const growth_rate = nums[0] !== 0
-    ? ((nums[n - 1] - nums[0]) / Math.abs(nums[0])) * 100
+  // 6. Growth Rate 
+  // Simple percentage change from the first valid point to the last valid point
+  const firstVal = cleanNums[0];
+  const lastVal  = cleanNums[n - 1];
+  const growth_rate = (firstVal !== 0 && firstVal !== null)
+    ? ((lastVal - firstVal) / Math.abs(firstVal)) * 100
     : null;
 
-  return { mean, median, std, min, max, trend, growth_rate, peakIdx, troughIdx, slope };
+  return { 
+    mean, 
+    median, 
+    std, 
+    min, 
+    max, 
+    trend, 
+    growth_rate, 
+    peakIdx, 
+    troughIdx, 
+    slope 
+  };
 }
 
 /* ============================================================
-   DOWNSAMPLING — Uniform sampling
-   For time series with >1000 rows, LTTB would be ideal,
-   but uniform sampling is implemented here for simplicity.
-   Replace with LTTB for better visual fidelity on dense data.
+   DOWNSAMPLING — LTTB (Largest Triangle Three Buckets)
+   Preserves visual characteristics (peaks/troughs) better than 
+   uniform sampling for large time-series datasets.
 ============================================================ */
 
-function uniformSample(rows, target) {
-  const result = [];
-  const step   = (rows.length - 1) / (target - 1);
-  for (let i = 0; i < target; i++) {
-    result.push(rows[Math.round(i * step)]);
+function downsampleLTTB(data, threshold) {
+  const dataLength = data.length;
+  if (threshold >= dataLength || threshold === 0) return data;
+
+  const sampled = [];
+  let sampledIndex = 0;
+
+  // Need a numeric Y-axis to calculate the "area". 
+  // Use the first numeric column we find in the row.
+  const firstNumericIdx = data[0].findIndex(v => typeof v === 'number');
+  const yIdx = firstNumericIdx !== -1 ? firstNumericIdx : 0;
+
+  // Bucket size. Leave room for start and end points
+  const bucketSize = (dataLength - 2) / (threshold - 2);
+
+  let a = 0; // The fixed point
+  let maxAreaBucketNext, maxArea, area, nextA;
+
+  sampled[sampledIndex++] = data[a]; // Always add the first point
+
+  for (let i = 0; i < threshold - 2; i++) {
+    // Calculate point average for next bucket (b)
+    let avgX = 0, avgY = 0, avgRangeStart = Math.floor((i + 1) * bucketSize) + 1;
+    let avgRangeEnd = Math.floor((i + 2) * bucketSize) + 1;
+    avgRangeEnd = avgRangeEnd < dataLength ? avgRangeEnd : dataLength;
+
+    const avgRangeLength = avgRangeEnd - avgRangeStart;
+
+    for (; avgRangeStart < avgRangeEnd; avgRangeStart++) {
+      avgX += avgRangeStart; 
+      avgY += (typeof data[avgRangeStart][yIdx] === 'number' ? data[avgRangeStart][yIdx] : 0);
+    }
+    avgX /= avgRangeLength;
+    avgY /= avgRangeLength;
+
+    // Get the range for this bucket
+    let rangeOffs = Math.floor((i + 0) * bucketSize) + 1;
+    const rangeTo = Math.floor((i + 1) * bucketSize) + 1;
+
+    // Point a
+    const pointAX = a;
+    const pointAY = (typeof data[a][yIdx] === 'number' ? data[a][yIdx] : 0);
+
+    maxArea = area = -1;
+
+    for (; rangeOffs < rangeTo; rangeOffs++) {
+      // Calculate triangle area over three buckets
+      area = Math.abs((pointAX - avgX) * ((typeof data[rangeOffs][yIdx] === 'number' ? data[rangeOffs][yIdx] : 0) - pointAY) -
+             (pointAX - rangeOffs) * (avgY - pointAY)) * 0.5;
+      
+      if (area > maxArea) {
+        maxArea = area;
+        maxAreaBucketNext = data[rangeOffs];
+        nextA = rangeOffs; // Next fixed point
+      }
+    }
+
+    sampled[sampledIndex++] = maxAreaBucketNext;
+    a = nextA;
   }
-  return result;
+
+  sampled[sampledIndex++] = data[dataLength - 1]; // Always add the last point
+  return sampled;
 }
 
 /* ============================================================
