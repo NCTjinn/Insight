@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@2.15.0/dist/dom-to-image-more.min.js"></script>
 
   <style>
     :root {
@@ -199,15 +199,25 @@
 
     /* --- Export Refinements --- */
     .chart-card.is-capturing {
-      border-radius: 0 !important; 
+      border-radius: 0 !important;
       box-shadow: none !important;
       border: 1px solid #e5e7eb !important;
       transition: none !important;
       background: #ffffff !important;
       color: #111827 !important;
     }
+    /* Force paper-white on all inner elements (both themes) */
+    .chart-card.is-capturing .card-inner,
+    .chart-card.is-capturing .card-header,
+    .chart-card.is-capturing .ai-summary-box {
+      background: #ffffff !important;
+      color: #111827 !important;
+    }
+    .chart-card.is-capturing .card-title,
+    .chart-card.is-capturing .ai-summary-text { color: #111827 !important; }
+    .chart-card.is-capturing .ai-label { color: #008f72 !important; }
 
-    /* Suppress all ApexCharts interactive overlays during capture */
+    /* Suppress ALL ApexCharts interactive overlays during capture */
     .chart-card.is-capturing .apexcharts-tooltip,
     .chart-card.is-capturing .apexcharts-xaxistooltip,
     .chart-card.is-capturing .apexcharts-yaxistooltip,
@@ -215,9 +225,11 @@
     .chart-card.is-capturing .apexcharts-ycrosshairs,
     .chart-card.is-capturing .apexcharts-xcrosshairs-hidden,
     .chart-card.is-capturing .apexcharts-selection-rect,
-    .chart-card.is-capturing .apexcharts-zoom-rect {
+    .chart-card.is-capturing .apexcharts-zoom-rect,
+    .chart-card.is-capturing .apexcharts-active {
       display: none !important;
       opacity: 0 !important;
+      visibility: hidden !important;
     }
 
     /* Hide interactive UI elements during capture */
@@ -236,33 +248,6 @@
       display: none !important;
     }
 
-    /* Force white background and dark text in capture mode (both themes) */
-    .chart-card.is-capturing .card-inner,
-    .chart-card.is-capturing .card-header,
-    .chart-card.is-capturing .ai-summary-box {
-      background: #ffffff !important;
-      color: #111827 !important;
-    }
-
-    .chart-card.is-capturing .card-title,
-    .chart-card.is-capturing .ai-summary-text {
-      color: #111827 !important;
-    }
-
-    .chart-card.is-capturing .ai-label {
-      color: #008f72 !important;
-    }
-
-    /* Hide interactive elements and UNGENERATED summary buttons during export */
-    .chart-card.is-capturing .card-checkbox,
-    .chart-card.is-capturing .card-actions,
-    .chart-card.is-capturing .ai-generate-btn,
-    .chart-card.is-capturing .card-title-hint,
-    .chart-card.is-capturing .drag-handle,
-    .chart-card.is-capturing .ai-skeleton {
-      display: none !important;
-    }
-
     /* Ensure the card expands to fit its content during capture */
     .chart-card {
       height: auto !important;
@@ -278,24 +263,16 @@
       flex-grow: 1; /* Pushes the summary to fill available space */
     }
     
-    /* Helps html2canvas calculate the correct height for text-heavy boxes */
+    /* Ensure summary box is fully visible for capture */
     .ai-summary-box {
       overflow: visible !important;
       height: auto !important;
-      display: block !important; /* Ensure it's not hidden if capture triggers mid-toggle */
+      display: block !important;
     }
 
-    /* Force charts to render at full opacity for the export process */
+    /* Force charts to render at full opacity in selection mode */
     .selection-mode .chart-card {
       opacity: 1 !important;
-    }
-
-    /* Hide UI elements specifically during html2canvas capture */
-    .chart-card .card-checkbox, 
-    .chart-card .card-actions,
-    .chart-card .ai-generate-btn {
-      /* This attribute is used by html2canvas to ignore elements */
-      data-html2canvas-ignore: true; 
     }
 
     /* Inner wrapper clips visual bg/radius but not positioned children */
@@ -504,9 +481,13 @@
     <p class="hero-sub">Upload your Excel file or connect a Google Sheet — Insight automatically generates charts and AI-powered summaries.</p>
 
     <div class="upload-card">
-      <div class="privacy-notice" style="margin-bottom:20px">
+      <div class="privacy-notice" style="margin-bottom:12px">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         <span>Your raw data never leaves your device. Only derived statistics are sent to our API for AI summaries. <a href="https://github.com/NCTjinn/Insight/" target="_blank">Learn more →</a></span>
+      </div>
+      <div class="privacy-notice" style="margin-bottom:20px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>AI can make mistakes. Please double-check responses.</span>
       </div>
 
       <div class="upload-tabs" role="tablist">
@@ -1146,22 +1127,27 @@ function initApexChart(entry){
 
 function updateAllCharts(){
   state.charts.forEach(entry=>{
-    if(!entry.apexInstance)return;
-    const{labels,values}=getChartData(entry);
-    if(entry.type==='donut'){
+    if(!entry.apexInstance) return;
+    const {labels, values} = getChartData(entry);
+
+    if(entry.type === 'donut'){
       entry.apexInstance.updateSeries(values);
-    } else if(entry.type==='bar'){
-      // Bar charts with distributed:true need series + xaxis updated in one call
-      // or ApexCharts may not re-render correctly when the data length changes
-      const ac='#00d4aa',ac2='#f59e0b',dng='#f85149',suc='#3fb950';
-      entry.apexInstance.updateOptions({
-        series:[{name:entry.yColumn||entry.title,data:values}],
-        xaxis:{categories:labels},
-        colors:[ac,ac2,'#0099ff','#7c3aed',suc,dng]
-      },false,false);
+
+    } else if(entry.type === 'bar'){
+      // distributed:true bars need a full destroy+reinit whenever the
+      // category set changes — updateOptions alone silently no-ops.
+      entry.apexInstance.destroy();
+      entry.apexInstance = null;
+      const el = document.getElementById('apex-' + entry.id);
+      if(el) el.innerHTML = '';
+      initApexChart(entry);
+
     } else {
-      entry.apexInstance.updateSeries([{name:entry.yColumn||entry.title,data:values}]);
-      entry.apexInstance.updateOptions({xaxis:{categories:labels}},false,false);
+      // line / area — safe to update in place
+      entry.apexInstance.updateOptions({
+        series: [{name: entry.yColumn || entry.title, data: values}],
+        xaxis: { categories: labels }
+      }, true, false);
     }
   });
 }
@@ -1370,7 +1356,6 @@ function applySummary(id, entry, sd){
     </div>
     <p class="ai-summary-text">${sd.text}</p>`;
   box.classList.add('visible');
-  if(sd.hasPeak || sd.hasCrash) { /* annotations disabled */ }
 }
 
 function clearSummary(id) {
@@ -1380,22 +1365,14 @@ function clearSummary(id) {
   const box = document.getElementById('ai-summary-' + id);
   const btn = document.getElementById('ai-btn-' + id);
 
-  // 1. Reset state
   entry.summaryLoaded = false;
   entry.summaryText = null;
   delete _summaryCache[id];
 
-  // 2. Clear DOM content to remove "ghost" text
   box.innerHTML = '';
   box.classList.remove('visible');
 
-  // 3. Re-show the generate button
   if (btn) btn.style.display = 'flex';
-  
-  // 4. Remove chart annotations if any
-  if (entry.apexInstance) {
-    entry.apexInstance.updateOptions({ annotations: { points: [] } }, false, false);
-  }
 }
 
 /* ============================================================
@@ -1486,6 +1463,72 @@ function toggleCardSelection(id){state.selectedCards.has(id)?state.selectedCards
 function updateSelectionBar(){document.getElementById('selection-count').textContent=state.selectedCards.size+' selected';document.getElementById('selection-bar').classList.toggle('visible',state.selectedCards.size>0||state.selectionMode)}
 
 /* ============================================================
+   SHARED EXPORT HELPER
+   Prepares a card for capture (light theme, no hover overlays),
+   runs dom-to-image-more, then restores the original theme.
+============================================================ */
+function safeFilename(title) {
+  return (title || 'chart').replace(/[^a-z0-9_\-\s]/gi, '').trim().replace(/\s+/g, '-') || 'chart';
+}
+
+async function captureCard(card, entry) {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  // 1. Enter capture mode
+  card.classList.add('is-capturing');
+
+  // 2. Switch chart to light theme + kill animations
+  if (entry?.apexInstance) {
+    await entry.apexInstance.updateOptions({
+      theme: { mode: 'light' },
+      chart: { animations: { enabled: false }, background: '#ffffff', foreColor: '#6b7280' },
+      grid: { borderColor: '#e5e7eb' },
+      tooltip: { theme: 'light' }
+    }, false, false);
+  }
+
+  // 3. Dismiss any lingering hover/tooltip state
+  card.querySelectorAll('.apexcharts-canvas').forEach(el =>
+    el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }))
+  );
+
+  // 4. Short settle delay so SVG re-paints fully
+  await new Promise(r => setTimeout(r, 350));
+
+  // 5. Capture with dom-to-image-more (proper SVG support)
+  const scale = 2;
+  const w = card.offsetWidth;
+  const h = card.offsetHeight;
+
+  let dataUrl;
+  try {
+    dataUrl = await domtoimage.toPng(card, {
+      bgcolor: '#ffffff',
+      width: w * scale,
+      height: h * scale,
+      style: {
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
+        width: w + 'px',
+        height: h + 'px'
+      }
+    });
+  } finally {
+    // 6. Always restore original theme
+    card.classList.remove('is-capturing');
+    if (entry?.apexInstance) {
+      entry.apexInstance.updateOptions({
+        theme: { mode: isDark ? 'dark' : 'light' },
+        chart: { animations: { enabled: true }, background: 'transparent', foreColor: isDark ? '#7d8590' : '#6b7280' },
+        grid: { borderColor: isDark ? '#21282f' : '#e5e7eb' },
+        tooltip: { theme: isDark ? 'dark' : 'light' }
+      }, false, false);
+    }
+  }
+  return dataUrl;
+}
+
+/* ============================================================
    EXPORT
 ============================================================ */
 async function exportCardPDF(id) {
@@ -1493,167 +1536,70 @@ async function exportCardPDF(id) {
   const entry = state.charts.find(c => c.id === id);
   if (!card || !entry) return;
 
-  card.classList.add('is-capturing');
-  if (entry.apexInstance) {
-    await entry.apexInstance.updateOptions({
-      theme: { mode: 'light' },
-      chart: { animations: { enabled: false }, foreColor: '#6b7280' }
-    }, false, false);
-  }
+  const dataUrl = await captureCard(card, entry);
+  if (!dataUrl) return;
 
-  // Dismiss any active tooltip / hover highlight before capture
-  card.querySelectorAll('.apexcharts-canvas').forEach(el => el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
+  const { jsPDF } = window.jspdf;
+  const img = new Image();
+  img.src = dataUrl;
+  await new Promise(r => { img.onload = r; });
 
-  await new Promise(r => setTimeout(r, 400));
-
-  try {
-    const canvas = await html2canvas(card, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff'
-    });
-
-    const { jsPDF } = window.jspdf;
-    const imgData = canvas.toDataURL('image/png', 1.0);
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`Insight-${id}.pdf`);
-  } finally {
-    card.classList.remove('is-capturing');
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (entry.apexInstance) {
-      entry.apexInstance.updateOptions({
-        theme: { mode: isDark ? 'dark' : 'light' },
-        chart: { animations: { enabled: true } }
-      }, false, false);
-    }
-  }
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (img.height * pdfWidth) / img.width;
+  pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+  pdf.save(`${safeFilename(entry.title)}.pdf`);
 }
 
 async function exportCardImage(id) {
   const card = document.getElementById(id);
   const entry = state.charts.find(c => c.id === id);
   if (!card || !entry) return;
-  
-  showToast('Preparing light-mode image...', 'success');
 
-  // 1. Enter capture mode & Force Light Mode for ApexCharts
-  card.classList.add('is-capturing');
-  if (entry.apexInstance) {
-    await entry.apexInstance.updateOptions({
-      theme: { mode: 'light' },
-      chart: { animations: { enabled: false }, foreColor: '#6b7280' },
-      grid: { borderColor: '#e5e7eb' }
-    }, false, false);
-  }
+  const dataUrl = await captureCard(card, entry);
+  if (!dataUrl) return;
 
-  // Dismiss any active tooltip / hover highlight before capture
-  card.querySelectorAll('.apexcharts-canvas').forEach(el => el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
-
-  await new Promise(r => setTimeout(r, 400));
-
-  try {
-    const canvas = await html2canvas(card, {
-      scale: 3,
-      useCORS: true,
-      backgroundColor: '#ffffff', // Always white background
-      logging: false
-    });
-
-    const a = document.createElement('a');
-    a.download = `Insight-${id}.png`;
-    a.href = canvas.toDataURL('image/png', 1.0);
-    a.click();
-  } finally {
-    // 2. Revert to original theme
-    card.classList.remove('is-capturing');
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (entry.apexInstance) {
-      entry.apexInstance.updateOptions({
-        theme: { mode: isDark ? 'dark' : 'light' },
-        chart: { animations: { enabled: true }, foreColor: isDark ? '#7d8590' : '#6b7280' },
-        grid: { borderColor: isDark ? '#21282f' : '#e5e7eb' }
-      }, false, false);
-    }
-  }
+  const a = document.createElement('a');
+  a.download = `${safeFilename(entry.title)}.png`;
+  a.href = dataUrl;
+  a.click();
 }
 
 async function exportSelected(fmt) {
   if (state.selectedCards.size === 0) return;
-  
   const selectedIds = Array.from(state.selectedCards);
-  showToast(`Exporting ${selectedIds.length} charts...`, 'success');
-
-  // Process sequentially to prevent "blank page" memory issues
+  showToast(`Exporting ${selectedIds.length} chart${selectedIds.length > 1 ? 's' : ''}…`, 'success');
   for (const id of selectedIds) {
-    if (fmt === 'pdf') {
-      await exportCardPDF(id); 
-    } else {
-      await exportCardImage(id);
-    }
-    // Small gap to prevent browser download blocking
-    await new Promise(r => setTimeout(r, 500));
+    if (fmt === 'pdf') await exportCardPDF(id);
+    else await exportCardImage(id);
+    await new Promise(r => setTimeout(r, 300));
   }
-
   clearSelection();
 }
 
 async function exportAllPDF() {
   const cards = document.querySelectorAll('.chart-card');
   if (cards.length === 0) return;
-
-  showToast('Generating multi-page report...', 'success');
+  showToast('Generating multi-page report…', 'success');
 
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
   const pdfWidth = pdf.internal.pageSize.getWidth();
-  const isDarkGlobal = document.documentElement.getAttribute('data-theme') === 'dark';
 
-  // Use for...of to ensure sequential processing (prevents blank pages)
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
     const entry = state.charts.find(c => c.id === card.id);
-    
-    card.classList.add('is-capturing');
-    if (entry?.apexInstance) {
-      await entry.apexInstance.updateOptions({
-        theme: { mode: 'light' },
-        chart: { animations: { enabled: false }, foreColor: '#6b7280' },
-        grid: { borderColor: '#e5e7eb' },
-        tooltip: { theme: 'light' }
-      }, false, false);
-    }
+    const dataUrl = await captureCard(card, entry);
+    if (!dataUrl) continue;
 
-    // Dismiss any lingering hover/tooltip state
-    card.querySelectorAll('.apexcharts-canvas').forEach(el => el.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true })));
+    const img = new Image();
+    img.src = dataUrl;
+    await new Promise(r => { img.onload = r; });
 
-    await new Promise(r => setTimeout(r, 350)); // Delay for rendering stability
-
-    const canvas = await html2canvas(card, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff'  // Always paper-white
-    });
-
-    const imgData = canvas.toDataURL('image/png', 1.0);
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
+    const pdfHeight = (img.height * pdfWidth) / img.width;
     if (i > 0) pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-
-    // Restore theme for this card before moving to next
-    card.classList.remove('is-capturing');
-    if (entry?.apexInstance) {
-      entry.apexInstance.updateOptions({
-        theme: { mode: isDarkGlobal ? 'dark' : 'light' },
-        chart: { animations: { enabled: true }, foreColor: isDarkGlobal ? '#7d8590' : '#6b7280' },
-        grid: { borderColor: isDarkGlobal ? '#21282f' : '#e5e7eb' },
-        tooltip: { theme: isDarkGlobal ? 'dark' : 'light' }
-      }, false, false);
-    }
+    pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    await new Promise(r => setTimeout(r, 200));
   }
 
   pdf.save('Insight-Full-Dashboard.pdf');
@@ -1663,14 +1609,10 @@ async function exportAllPDF() {
 async function exportAllImages() {
   const cards = document.querySelectorAll('.chart-card');
   if (cards.length === 0) return;
-
-  showToast('Exporting all charts as images...', 'success');
-
-  // Sequential loop ensures each card has dedicated GPU/CPU focus
+  showToast('Exporting all charts as images…', 'success');
   for (const card of cards) {
     await exportCardImage(card.id);
-    // Prevents "File limit reached" or download queuing issues
-    await new Promise(r => setTimeout(r, 400));
+    await new Promise(r => setTimeout(r, 300));
   }
 }
 
