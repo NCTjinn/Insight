@@ -197,6 +197,41 @@
     .chart-card.dragging{opacity:.5;border:2px dashed var(--accent)}
     .chart-card.drag-target{border:2px dashed var(--accent2)}
 
+    /* Ensure the card expands to fit its content during capture */
+    .chart-card {
+      height: auto !important;
+      min-height: min-content;
+    }
+
+    .card-inner {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-ai-section {
+      flex-grow: 1; /* Pushes the summary to fill available space */
+    }
+    
+    /* Helps html2canvas calculate the correct height for text-heavy boxes */
+    .ai-summary-box {
+      overflow: visible !important;
+      height: auto !important;
+      display: block !important; /* Ensure it's not hidden if capture triggers mid-toggle */
+    }
+
+    /* Force charts to render at full opacity for the export process */
+    .selection-mode .chart-card {
+      opacity: 1 !important;
+    }
+
+    /* Hide UI elements specifically during html2canvas capture */
+    .chart-card .card-checkbox, 
+    .chart-card .card-actions,
+    .chart-card .ai-generate-btn {
+      /* This attribute is used by html2canvas to ignore elements */
+      data-html2canvas-ignore: true; 
+    }
+
     /* Inner wrapper clips visual bg/radius but not positioned children */
     /* overflow:visible so tooltips/dropdowns inside card-actions are never clipped */
     .card-inner{background:var(--surface);border-radius:var(--radius-lg);overflow:visible}
@@ -1385,28 +1420,188 @@ function updateSelectionBar(){document.getElementById('selection-count').textCon
 async function exportCardPDF(id) {
   const card = document.getElementById(id);
   if (!card) return;
-  showToast('Generating PDF...', 'success');
   
+  showToast('Preparing high-res PDF...', 'success');
+
+  // 1. Temporarily disable chart animations for a clean capture
+  const entry = state.charts.find(c => c.id === id);
+  if (entry && entry.apexInstance) {
+    await entry.apexInstance.updateOptions({ chart: { animations: { enabled: false } } }, false, false);
+  }
+
+  // 2. Wait a brief moment for the DOM to settle
+  await new Promise(resolve => setTimeout(resolve, 100));
+
   const canvas = await html2canvas(card, {
-    scale: 2, // Higher resolution for print 
+    scale: 2, 
     useCORS: true,
-    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()
+    // Ensure the background is opaque to prevent "washed out" look
+    backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+    // Force capture of the full scrollable height
+    height: card.scrollHeight,
+    windowHeight: card.scrollHeight,
+    logging: false
   });
+
+  // 3. Re-enable animations after capture
+  if (entry && entry.apexInstance) {
+    entry.apexInstance.updateOptions({ chart: { animations: { enabled: true } } }, false, false);
+  }
   
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF('l', 'mm', 'a4');
-  const imgData = canvas.toDataURL('image/png');
-  const imgProps = pdf.getImageProperties(imgData);
-  const pdfWidth = pdf.internal.pageSize.getWidth();
+  // Use a dynamic height for the PDF page based on the content
+  const imgData = canvas.toDataURL('image/png', 1.0);
+  const imgProps = new jsPDF('l', 'mm', 'a4').getImageProperties(imgData);
+  
+  const pdfWidth = 210; // A4 Width in mm
   const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
   
+  const pdf = new jsPDF('p', 'mm', [pdfWidth, pdfHeight]);
   pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-  pdf.save(`${id}-export.pdf`);
+  pdf.save(`${id}-analysis.pdf`);
 }
-async function exportCardImage(id){const card=document.getElementById(id);if(!card)return;showToast('Preparing image…','success');try{const canvas=await html2canvas(card,{backgroundColor:null,scale:2});const a=document.createElement('a');a.download='insight-chart.png';a.href=canvas.toDataURL('image/png');a.click();showToast('Image exported','success')}catch{showToast('Export failed','error')}}
-async function exportSelected(fmt){for(const id of state.selectedCards){if(fmt==='pdf')await exportCardPDF(id);else await exportCardImage(id)}clearSelection()}
-async function exportAllPDF(){showToast('Exporting all charts…','success');try{const{jsPDF}=window.jspdf;const pdf=new jsPDF({orientation:'landscape',unit:'mm'});const cards=document.querySelectorAll('.chart-card');for(let i=0;i<cards.length;i++){const canvas=await html2canvas(cards[i],{backgroundColor:null,scale:2});const pw=pdf.internal.pageSize.getWidth()-20;if(i>0)pdf.addPage();pdf.addImage(canvas.toDataURL('image/png'),'PNG',10,10,pw,pw/(canvas.width/canvas.height))}pdf.save('insight-dashboard.pdf');showToast('Dashboard PDF exported','success')}catch{showToast('Export failed','error')}}
-async function exportAllImages(){for(const c of document.querySelectorAll('.chart-card'))await exportCardImage(c.id)}
+
+async function exportCardImage(id) {
+  const card = document.getElementById(id);
+  if (!card) return;
+  
+  showToast('Preparing high-res image...', 'success');
+
+  try {
+    // Disable animations for transparency/opacity stability
+    const entry = state.charts.find(c => c.id === id);
+    if (entry && entry.apexInstance) {
+      await entry.apexInstance.updateOptions({ chart: { animations: { enabled: false } } }, false, false);
+    }
+
+    const canvas = await html2canvas(card, {
+      scale: 3, // Extra detail for images
+      useCORS: true,
+      backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+      height: card.scrollHeight,
+      windowHeight: card.scrollHeight
+    });
+
+    if (entry && entry.apexInstance) {
+      entry.apexInstance.updateOptions({ chart: { animations: { enabled: true } } }, false, false);
+    }
+
+    const a = document.createElement('a');
+    a.download = `Insight-${id}.png`;
+    a.href = canvas.toDataURL('image/png', 1.0);
+    a.click();
+    showToast('Image exported', 'success');
+  } catch (err) {
+    showToast('Export failed', 'error');
+  }
+}
+
+async function exportSelected(fmt) {
+  if (state.selectedCards.size === 0) return;
+
+  showToast(`Exporting ${state.selectedCards.size} selected charts...`, 'success');
+
+  // Convert Set to Array to loop through IDs
+  const selectedIds = Array.from(state.selectedCards);
+
+  for (const id of selectedIds) {
+    try {
+      if (fmt === 'pdf') {
+        // Calls the refined version with animation disabling and full height
+        await exportCardPDF(id); 
+      } else {
+        // Calls the refined version with scale: 3 and background fixes
+        await exportCardImage(id);
+      }
+      
+      // Small delay between downloads to prevent browser blocking
+      await new Promise(r => setTimeout(r, 400));
+    } catch (err) {
+      console.error(`[Insight] Failed to export ${id}:`, err);
+    }
+  }
+
+  // Clear the selection mode once the batch is done
+  clearSelection();
+}
+
+async function exportAllPDF() {
+  const cards = document.querySelectorAll('.chart-card');
+  if (cards.length === 0) {
+    showToast('No charts to export', 'error');
+    return;
+  }
+
+  showToast('Preparing full dashboard report...', 'success');
+
+  // 1. Prepare all charts for capture (disable animations globally)
+  for (const entry of state.charts) {
+    if (entry.apexInstance) {
+      await entry.apexInstance.updateOptions({ chart: { animations: { enabled: false } } }, false, false);
+    }
+  }
+
+  // 2. Brief wait for all chart layers to stabilize
+  await new Promise(r => setTimeout(r, 200));
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      
+      // Capture each card using its scrollHeight to prevent summary clipping
+      const canvas = await html2canvas(card, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: bgColor,
+        height: card.scrollHeight,
+        windowHeight: card.scrollHeight
+      });
+
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      // Add new page if not the first card
+      if (i > 0) pdf.addPage();
+
+      // If the card is taller than the page, the PDF page will scale it down to fit the width
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    }
+
+    pdf.save('Insight-Full-Dashboard.pdf');
+    showToast('Dashboard PDF exported', 'success');
+  } catch (err) {
+    console.error('[Insight] Multi-PDF Export Error:', err);
+    showToast('Export failed', 'error');
+  } finally {
+    // 3. Re-enable animations for interactive use
+    for (const entry of state.charts) {
+      if (entry.apexInstance) {
+        entry.apexInstance.updateOptions({ chart: { animations: { enabled: true } } }, false, false);
+      }
+    }
+  }
+}
+
+async function exportAllImages() {
+  const cards = document.querySelectorAll('.chart-card');
+  if (cards.length === 0) return;
+
+  showToast('Exporting all as high-res images...', 'success');
+
+  // Loop through and reuse the single-card logic
+  // Use a for...of loop to avoid triggering too many simultaneous downloads
+  for (const card of cards) {
+    await exportCardImage(card.id);
+    // Tiny delay to prevent browser download congestion
+    await new Promise(r => setTimeout(r, 300));
+  }
+}
 
 /* ============================================================
    SESSION SAVE / LOAD
