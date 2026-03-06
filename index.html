@@ -233,51 +233,44 @@
     }
 
     /* Force the background and text colors to the light-mode values during capture */
-    [data-theme="dark"] .chart-card.is-capturing {
+    .chart-card.is-capturing {
       background: #ffffff !important;
       color: #111827 !important;
       border-color: #e5e7eb !important;
     }
 
-    [data-theme="dark"] .chart-card.is-capturing .card-inner,
-    [data-theme="dark"] .chart-card.is-capturing .card-header,
-    [data-theme="dark"] .chart-card.is-capturing .ai-summary-box {
+    .chart-card.is-capturing .card-inner,
+    .chart-card.is-capturing .card-header,
+    .chart-card.is-capturing .ai-summary-box {
       background: #ffffff !important;
       color: #111827 !important;
     }
 
-    [data-theme="dark"] .chart-card.is-capturing .card-title,
-    [data-theme="dark"] .chart-card.is-capturing .ai-summary-text {
+    .chart-card.is-capturing .card-title,
+    .chart-card.is-capturing .ai-summary-text {
       color: #111827 !important;
     }
 
     /* Fix: strong tags inherit the dark --text variable — force dark in light export */
-    [data-theme="dark"] .chart-card.is-capturing .ai-summary-text strong {
+    .chart-card.is-capturing .ai-summary-text strong {
       color: #111827 !important;
     }
 
     /* Fix: list items inside summary use inline color:var(--text-muted) — override */
-    [data-theme="dark"] .chart-card.is-capturing .ai-summary-box ul,
-    [data-theme="dark"] .chart-card.is-capturing .ai-summary-box li {
+    .chart-card.is-capturing .ai-summary-box ul,
+    .chart-card.is-capturing .ai-summary-box li {
       color: #374151 !important;
     }
 
     /* Fix: ai-label dot and range pill still reference dark-mode accent */
-    [data-theme="dark"] .chart-card.is-capturing .ai-label {
+    .chart-card.is-capturing .ai-label {
       color: #008f72 !important;
     }
 
-    [data-theme="dark"] .chart-card.is-capturing .ai-range-pill {
+    .chart-card.is-capturing .ai-range-pill {
       color: #008f72 !important;
       background: rgba(0,143,114,0.1) !important;
       border-color: rgba(0,143,114,0.4) !important;
-    }
-
-    /* Light mode: give the AI summary box a black border + paper-white background
-       on export, matching the forced appearance used in dark-mode captures */
-    [data-theme="light"] .chart-card.is-capturing .ai-summary-box {
-      background: #ffffff !important;
-      border: 1px solid #000000 !important;
     }
 
     /* Ensure the card expands to fit its content during capture */
@@ -1061,19 +1054,52 @@ function getChartData(entry) {
   let labels = xCol.labels;
   let values = yCol.values.map(v => typeof v === 'number' ? v : parseFloat(v) || 0);
 
-  // 1. Time range slicing (for date roles)
+  // 1. Time range slicing
   if (xCol.role === 'date' && xCol.values.length > 0) {
-    const maxDateInData = Math.max(...xCol.values.filter(v => v !== null));
+    // ── Date x-axis: filter directly on xCol timestamps ──────────────────────
     const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
     const days = state.timeRange === 'CUSTOM' && state.customDateRange
       ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
       : (limits[state.timeRange] || Infinity);
 
     if (days < Infinity) {
-      const cutoff = maxDateInData - (days * 86400000);
-      const idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= cutoff).map(({ i }) => i);
+      let idxs;
+      if (state.timeRange === 'CUSTOM' && state.customDateRange) {
+        const fromMs = new Date(state.customDateRange.from).getTime();
+        const toMs   = new Date(state.customDateRange.to).getTime();
+        idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= fromMs && v <= toMs).map(({ i }) => i);
+      } else {
+        const maxDateInData = Math.max(...xCol.values.filter(v => v !== null));
+        const cutoff = maxDateInData - (days * 86400000);
+        idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= cutoff).map(({ i }) => i);
+      }
       labels = idxs.map(i => xCol.labels[i]);
       values = idxs.map(i => yCol.values[i] || 0);
+    }
+  } else if (xCol.role === 'categorical') {
+    // ── Categorical x-axis (bar / donut): locate a date column and use it
+    //    to filter rows before aggregation, so the time range control works. ──
+    const dateCol = ds.columns.find(c => c.role === 'date');
+    if (dateCol && dateCol.values.length > 0) {
+      const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
+      const days = state.timeRange === 'CUSTOM' && state.customDateRange
+        ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
+        : (limits[state.timeRange] || Infinity);
+
+      if (days < Infinity) {
+        let idxs;
+        if (state.timeRange === 'CUSTOM' && state.customDateRange) {
+          const fromMs = new Date(state.customDateRange.from).getTime();
+          const toMs   = new Date(state.customDateRange.to).getTime();
+          idxs = dateCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= fromMs && v <= toMs).map(({ i }) => i);
+        } else {
+          const maxDate = Math.max(...dateCol.values.filter(v => v !== null));
+          const cutoff  = maxDate - (days * 86400000);
+          idxs = dateCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= cutoff).map(({ i }) => i);
+        }
+        labels = idxs.map(i => xCol.labels ? xCol.labels[i] : String(xCol.values[i]));
+        values = idxs.map(i => yCol.values[i] || 0);
+      }
     }
   }
 
@@ -1165,18 +1191,12 @@ function updateAllCharts(){
     if(entry.type==='donut'){
       entry.apexInstance.updateSeries(values);
     } else if(entry.type==='bar'){
-      // Distributed bar charts require a single atomic updateOptions — separate
-      // updateSeries + updateOptions calls race and silently drop the re-render.
-      // Colors must be one-per-bar (cycled) and plotOptions.distributed must be
-      // re-asserted, otherwise ApexCharts quietly reverts to non-distributed mode.
-      const _palette = [ac,ac2,'#0099ff','#7c3aed',suc,dng];
-      const _barColors = values.map((_,i) => _palette[i % _palette.length]);
-      entry.apexInstance.updateOptions({
-        series:[{name:entry.yColumn||entry.title,data:values}],
-        xaxis:{categories:labels},
-        colors:_barColors,
-        plotOptions:{bar:{borderRadius:4,columnWidth:'55%',distributed:true}}
-      },false,true);
+      // distributed:true bar charts can't update in place when the category
+      // count changes (ApexCharts silently drops the re-render).
+      // Safest fix: destroy the old instance and build a fresh one.
+      entry.apexInstance.destroy();
+      entry.apexInstance = null;
+      initApexChart(entry);
     } else {
       entry.apexInstance.updateSeries([{name:entry.yColumn||entry.title,data:values}]);
       entry.apexInstance.updateOptions({xaxis:{categories:labels}});
