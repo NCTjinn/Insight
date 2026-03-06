@@ -273,6 +273,13 @@
       border-color: rgba(0,143,114,0.4) !important;
     }
 
+    /* Light mode: give the AI summary box a black border + paper-white background
+       on export, matching the forced appearance used in dark-mode captures */
+    [data-theme="light"] .chart-card.is-capturing .ai-summary-box {
+      background: #ffffff !important;
+      border: 1px solid #000000 !important;
+    }
+
     /* Ensure the card expands to fit its content during capture */
     .chart-card {
       height: auto !important;
@@ -1160,10 +1167,15 @@ function updateAllCharts(){
     } else if(entry.type==='bar'){
       // Distributed bar charts require a single atomic updateOptions — separate
       // updateSeries + updateOptions calls race and silently drop the re-render.
+      // Colors must be one-per-bar (cycled) and plotOptions.distributed must be
+      // re-asserted, otherwise ApexCharts quietly reverts to non-distributed mode.
+      const _palette = [ac,ac2,'#0099ff','#7c3aed',suc,dng];
+      const _barColors = values.map((_,i) => _palette[i % _palette.length]);
       entry.apexInstance.updateOptions({
         series:[{name:entry.yColumn||entry.title,data:values}],
         xaxis:{categories:labels},
-        colors:[ac,ac2,'#0099ff','#7c3aed',suc,dng]
+        colors:_barColors,
+        plotOptions:{bar:{borderRadius:4,columnWidth:'55%',distributed:true}}
       },false,true);
     } else {
       entry.apexInstance.updateSeries([{name:entry.yColumn||entry.title,data:values}]);
