@@ -79,8 +79,8 @@
     .wordmark{font-weight:800;font-size:22px;letter-spacing:-0.5px;color:var(--accent)}
     .header-actions{display:flex;align-items:center;gap:12px}
 
-    .upload-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;position:relative;z-index:2}
-    .hero-sub{font-size:16px;color:var(--text-muted);text-align:center;margin-bottom:48px;max-width:460px;line-height:1.6;font-weight:300}
+    .upload-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;position:relative;z-index:2}
+    .hero-sub{font-size:16px;color:var(--text-muted);text-align:center;margin-bottom:24px;max-width:460px;line-height:1.6;font-weight:300}
 
     .upload-card{background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius-lg);padding:40px;width:100%;max-width:560px;box-shadow:var(--shadow)}
 
@@ -325,7 +325,7 @@
     .ai-label{display:flex;align-items:center;gap:6px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
     .ai-label-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
     .ai-range-pill{background:var(--accent-dim);border:1px solid var(--accent);border-radius:20px;padding:1px 7px;font-size:10px;font-weight:600;color:var(--accent);text-transform:none;letter-spacing:0;white-space:nowrap}
-    .ai-summary-text{font-size:13px;line-height:1.65;color:var(--text-muted)}
+    .ai-summary-text{font-size:13px;line-height:1.65;color:var(--text-muted);padding-bottom:2px}
     .ai-summary-text strong{color:var(--text);font-weight:600}
     .ai-highlight-peak{display:inline-flex;align-items:center;gap:4px;background:rgba(63,185,80,.15);border:1px solid rgba(63,185,80,.3);color:var(--success);border-radius:4px;padding:0 5px;font-size:11px;font-weight:500}
     .ai-highlight-crash{display:inline-flex;align-items:center;gap:4px;background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.25);color:var(--danger);border-radius:4px;padding:0 5px;font-size:11px;font-weight:500}
@@ -509,7 +509,7 @@
     <div class="upload-card">
       <div class="privacy-notice" style="margin-bottom:20px">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>Your raw data never leaves your device. Only derived statistics are sent to our API for AI summaries. <a href="https://github.com/NCTjinn/Insight/" target="_blank">Learn more →</a></span>
+        <span>AI can make mistakes, please double-check. Your raw data is processed locally and never uploaded. Only derived statistics are sent to the AI for summaries. <a href="https://github.com/NCTjinn/Insight/" target="_blank">Learn more →</a></span>
       </div>
 
       <div class="upload-tabs" role="tablist">
@@ -668,7 +668,7 @@
   <div style="padding:0 32px 12px">
     <div class="privacy-notice">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span>Your raw data is processed locally and never uploaded. Only derived statistics are sent to the AI for summaries. &nbsp;<a href="https://github.com/NCTjinn/Insight/" target="_blank">View Privacy Policy on GitHub →</a></span>
+      <span>AI can make mistakes, please double-check. Your raw data is processed locally and never uploaded. Only derived statistics are sent to the AI for summaries. &nbsp;<a href="https://github.com/NCTjinn/Insight/" target="_blank">Learn more →</a></span>
     </div>
   </div>
 
@@ -1400,7 +1400,7 @@ function applySummary(id, entry, sd, rangeKey) {
       </div>
       <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="clearSummary('${id}')">Clear</button>
     </div>
-    <p class="ai-summary-text">${sd.text}</p>`;
+    <div class="ai-summary-text">${sd.text}</div>`;
   box.classList.add('visible');
   document.getElementById('ai-btn-' + id).style.display = 'none';
 }
@@ -1763,7 +1763,7 @@ function loadSession(session){
       entry.summaryText=cfg.summaryText;entry.summaryLoaded=true;entry.summaryRangeKey=sessionRangeKey;
       requestAnimationFrame(()=>{
         const box=document.getElementById('ai-summary-'+entry.id);if(!box)return;
-        box.innerHTML=`<div class="ai-summary-header"><div class="ai-label"><div class="ai-label-dot"></div> AI Analysis <span class="ai-range-pill">Saved session</span></div><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="clearSummary('${entry.id}')">Clear</button></div><p class="ai-summary-text">${cfg.summaryText}</p>`;
+        box.innerHTML=`<div class="ai-summary-header"><div class="ai-label"><div class="ai-label-dot"></div> AI Analysis <span class="ai-range-pill">Saved session</span></div><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="clearSummary('${entry.id}')">Clear</button></div><div class="ai-summary-text">${cfg.summaryText}</div>`;
         box.classList.add('visible');document.getElementById('ai-btn-'+entry.id).style.display='none';
       });
     }
