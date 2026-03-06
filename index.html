@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.1.5/dist/dom-to-image-more.min.js"></script>
 
   <style>
     :root {
@@ -80,12 +80,12 @@
     .header-actions{display:flex;align-items:center;gap:12px}
 
     .upload-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;position:relative;z-index:2}
-    .hero-sub{font-size:17px;color:var(--text-muted);text-align:center;margin-bottom:48px;max-width:480px;line-height:1.6;font-weight:300}
+    .hero-sub{font-size:16px;color:var(--text-muted);text-align:center;margin-bottom:48px;max-width:460px;line-height:1.6;font-weight:300}
 
     .upload-card{background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius-lg);padding:40px;width:100%;max-width:560px;box-shadow:var(--shadow)}
 
     .upload-tabs{display:flex;background:var(--surface2);border-radius:var(--radius);padding:4px;margin-bottom:28px;gap:2px}
-    .upload-tab{flex:1;padding:9px 12px;border:none;background:transparent;color:var(--text-muted);font-size:14px;font-weight:500;border-radius:7px;transition:all var(--trans)}
+    .upload-tab{flex:1;padding:9px 12px;border:none;background:transparent;color:var(--text-muted);font-size:13px;font-weight:500;border-radius:7px;transition:all var(--trans)}
     .upload-tab.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow-sm)}
     .tab-panel{display:none}
     .tab-panel.active{display:block}
@@ -94,18 +94,18 @@
     .dropzone:hover,.dropzone.drag-over{border-color:var(--accent);background:var(--accent-dim)}
     .dropzone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
     .dropzone-icon{width:48px;height:48px;background:var(--accent-dim);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:var(--accent)}
-    .dropzone-title{font-weight:600;font-size:16px;margin-bottom:6px}
-    .dropzone-sub{font-size:14px;color:var(--text-muted)}
+    .dropzone-title{font-weight:600;font-size:15px;margin-bottom:6px}
+    .dropzone-sub{font-size:13px;color:var(--text-muted)}
 
     .url-form{display:flex;flex-direction:column;gap:12px}
-    .input-field{width:100%;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);padding:11px 14px;color:var(--text);font-size:15px;outline:none;transition:border-color var(--trans)}
+    .input-field{width:100%;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);padding:11px 14px;color:var(--text);font-size:14px;outline:none;transition:border-color var(--trans)}
     .input-field:focus{border-color:var(--accent)}
     .input-field::placeholder{color:var(--text-muted)}
-    .input-label{font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:block}
-    .sheets-note{background:var(--accent2-dim);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--accent2);line-height:1.5}
+    .input-label{font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;display:block}
+    .sheets-note{background:var(--accent2-dim);border:1px solid rgba(245,158,11,0.2);border-radius:var(--radius);padding:12px 14px;font-size:12px;color:var(--accent2);line-height:1.5}
 
     /* Buttons */
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:var(--radius);font-size:15px;font-weight:500;border:none;outline:none;transition:all var(--trans);text-decoration:none}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:var(--radius);font-size:14px;font-weight:500;border:none;outline:none;transition:all var(--trans);text-decoration:none}
     .btn-primary{background:var(--accent);color:#0d1117;font-weight:600}
     .btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,212,170,.3)}
     .btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border-lit)}
@@ -115,16 +115,16 @@
     .btn-icon{width:34px;height:34px;padding:0;border-radius:8px}
     .btn-full{width:100%}
 
-    .divider-text{display:flex;align-items:center;gap:12px;color:var(--text-faint);font-size:13px;margin:20px 0}
+    .divider-text{display:flex;align-items:center;gap:12px;color:var(--text-faint);font-size:12px;margin:20px 0}
     .divider-text::before,.divider-text::after{content:'';flex:1;height:1px;background:var(--border)}
 
     .session-upload-area{border:2px dashed var(--border-lit);border-radius:var(--radius);padding:32px 24px;text-align:center;cursor:pointer;transition:all var(--trans);position:relative}
     .session-upload-area:hover{border-color:var(--accent2);background:var(--accent2-dim)}
     .session-upload-area input{position:absolute;inset:0;opacity:0;cursor:pointer}
 
-    .privacy-badge{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);margin-top:16px;justify-content:center}
+    .privacy-badge{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin-top:16px;justify-content:center}
 
-    .upload-footer{padding:24px 48px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:14px;color:var(--text-muted)}
+    .upload-footer{padding:24px 48px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:13px;color:var(--text-muted)}
 
     /* Theme toggle — icon button (moon in dark, sun in light) */
     .theme-btn{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:8px;background:var(--surface2);border:1px solid var(--border-lit);color:var(--text-muted);transition:all var(--trans);cursor:pointer;flex-shrink:0}
@@ -134,8 +134,8 @@
     [data-theme="light"] .theme-btn .icon-moon{display:none}
     [data-theme="light"] .theme-btn .icon-sun{display:block}
 
-    /* Banner notice — unified single-line banner */
-    .privacy-notice{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:13px;color:var(--text-muted);line-height:1.5;display:flex;align-items:flex-start;gap:10px}
+    /* Privacy notice */
+    .privacy-notice{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;font-size:12px;color:var(--text-muted);line-height:1.5;display:flex;align-items:flex-start;gap:10px}
     .privacy-notice svg{flex-shrink:0;margin-top:1px;color:var(--accent)}
     .privacy-notice a{color:var(--accent);text-decoration:none}
     .privacy-notice a:hover{text-decoration:underline}
@@ -147,10 +147,10 @@
     .topbar-left{display:flex;align-items:center;gap:16px;min-width:0;flex:1}
     .topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
 
-    .topbar-wordmark{font-weight:800;font-size:20px;letter-spacing:-0.4px;color:var(--accent);flex-shrink:0}
+    .topbar-wordmark{font-weight:800;font-size:18px;letter-spacing:-0.4px;color:var(--accent);flex-shrink:0}
 
     /* Dataset badge — truncate long filenames */
-    .dataset-badge{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:20px;padding:4px 12px;font-size:13px;color:var(--text-muted);min-width:0;max-width:260px}
+    .dataset-badge{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--text-muted);min-width:0;max-width:260px}
     .dataset-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);animation:pulse 2s infinite;flex-shrink:0}
     .dataset-badge span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -162,13 +162,13 @@
 
     /* Preset time buttons */
     .time-range-btns{display:flex;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);overflow:hidden}
-    .time-btn{padding:6px 13px;border:none;background:transparent;color:var(--text-muted);font-size:13px;font-weight:500;transition:all var(--trans);cursor:pointer}
+    .time-btn{padding:6px 13px;border:none;background:transparent;color:var(--text-muted);font-size:12px;font-weight:500;transition:all var(--trans);cursor:pointer}
     .time-btn:hover{color:var(--text);background:var(--surface3)}
     .time-btn.active{background:var(--accent);color:#0d1117;font-weight:600}
 
     /* Custom date range */
     .date-range-wrap{position:relative}
-    .date-range-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border-lit);color:var(--text-muted);font-size:13px;font-weight:500;cursor:pointer;transition:all var(--trans);white-space:nowrap}
+    .date-range-btn{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border-lit);color:var(--text-muted);font-size:12px;font-weight:500;cursor:pointer;transition:all var(--trans);white-space:nowrap}
     .date-range-btn:hover{border-color:var(--accent);color:var(--text)}
     .date-range-btn.has-value{border-color:var(--accent);color:var(--accent)}
 
@@ -269,7 +269,7 @@
       flex-grow: 1; /* Pushes the summary to fill available space */
     }
     
-    /* Helps html2canvas calculate the correct height for text-heavy boxes */
+    /* Helps dom-to-image-more calculate the correct height for text-heavy boxes */
     .ai-summary-box {
       overflow: visible !important;
       height: auto !important;
@@ -281,29 +281,21 @@
       opacity: 1 !important;
     }
 
-    /* Hide UI elements specifically during html2canvas capture */
-    .chart-card .card-checkbox, 
-    .chart-card .card-actions,
-    .chart-card .ai-generate-btn {
-      /* This attribute is used by html2canvas to ignore elements */
-      data-html2canvas-ignore: true; 
-    }
-
     /* Inner wrapper clips visual bg/radius but not positioned children */
     /* overflow:visible so tooltips/dropdowns inside card-actions are never clipped */
     .card-inner{background:var(--surface);border-radius:var(--radius-lg);overflow:visible}
 
     .card-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;gap:12px}
     .card-title-wrap{flex:1;min-width:0}
-    .card-title{font-size:16px;font-weight:700;color:var(--text);cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;outline:none;border-radius:4px;padding:2px 4px;margin:-2px -4px;transition:background var(--trans)}
+    .card-title{font-size:15px;font-weight:700;color:var(--text);cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;outline:none;border-radius:4px;padding:2px 4px;margin:-2px -4px;transition:background var(--trans)}
     .card-title:hover{background:var(--surface2)}
     .card-title:focus{background:var(--surface2);white-space:normal;overflow:visible}
-    .card-title-hint{font-size:11px;color:var(--text-faint);letter-spacing:.5px;margin-top:1px}
+    .card-title-hint{font-size:10px;color:var(--text-faint);letter-spacing:.5px;margin-top:1px}
     .card-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
     .card-chart{padding:0 8px}
     .card-ai-section{padding:0 20px 20px}
 
-    .ai-generate-btn{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);color:var(--text-muted);font-size:14px;font-weight:500;transition:all var(--trans);margin-top:4px}
+    .ai-generate-btn{display:flex;align-items:center;gap:8px;width:100%;padding:10px 14px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);color:var(--text-muted);font-size:13px;font-weight:500;transition:all var(--trans);margin-top:4px}
     .ai-generate-btn:hover{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
     .ai-generate-btn .ai-icon{width:20px;height:20px;background:linear-gradient(135deg,var(--accent),#0099ff);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px}
 
@@ -311,13 +303,14 @@
     .ai-summary-box.visible{display:block}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     .ai-summary-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-    .ai-label{display:flex;align-items:center;gap:6px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
+    .ai-label{display:flex;align-items:center;gap:6px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--accent)}
     .ai-label-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
-    .ai-summary-text{font-size:14px;line-height:1.65;color:var(--text-muted)}
+    .ai-range-pill{background:var(--accent-dim);border:1px solid var(--accent);border-radius:20px;padding:1px 7px;font-size:10px;font-weight:600;color:var(--accent);text-transform:none;letter-spacing:0;white-space:nowrap}
+    .ai-summary-text{font-size:13px;line-height:1.65;color:var(--text-muted)}
     .ai-summary-text strong{color:var(--text);font-weight:600}
-    .ai-highlight-peak{display:inline-flex;align-items:center;gap:4px;background:rgba(63,185,80,.15);border:1px solid rgba(63,185,80,.3);color:var(--success);border-radius:4px;padding:0 5px;font-size:12px;font-weight:500}
-    .ai-highlight-crash{display:inline-flex;align-items:center;gap:4px;background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.25);color:var(--danger);border-radius:4px;padding:0 5px;font-size:12px;font-weight:500}
-    .ai-error-box{margin-top:4px;background:rgba(248,81,73,.06);border:1px solid rgba(248,81,73,.2);border-radius:var(--radius);padding:12px 14px;font-size:14px;color:var(--danger);display:none}
+    .ai-highlight-peak{display:inline-flex;align-items:center;gap:4px;background:rgba(63,185,80,.15);border:1px solid rgba(63,185,80,.3);color:var(--success);border-radius:4px;padding:0 5px;font-size:11px;font-weight:500}
+    .ai-highlight-crash{display:inline-flex;align-items:center;gap:4px;background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.25);color:var(--danger);border-radius:4px;padding:0 5px;font-size:11px;font-weight:500}
+    .ai-error-box{margin-top:4px;background:rgba(248,81,73,.06);border:1px solid rgba(248,81,73,.2);border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--danger);display:none}
     .ai-error-box.visible{display:block}
     .ai-skeleton{display:none;padding:14px 16px;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);margin-top:4px}
     .ai-skeleton.visible{display:block}
@@ -330,15 +323,15 @@
     .modal-overlay.open{opacity:1;pointer-events:all}
     .modal{background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius-lg);padding:32px;width:100%;max-width:520px;box-shadow:var(--shadow);transform:translateY(16px);transition:transform var(--trans)}
     .modal-overlay.open .modal{transform:translateY(0)}
-    .modal-title{font-size:22px;font-weight:700;margin-bottom:8px}
-    .modal-sub{font-size:14px;color:var(--text-muted);margin-bottom:24px}
+    .modal-title{font-size:20px;font-weight:700;margin-bottom:8px}
+    .modal-sub{font-size:13px;color:var(--text-muted);margin-bottom:24px}
     .form-row{display:flex;gap:12px}
     .form-group{flex:1;display:flex;flex-direction:column;gap:6px}
-    .select-field{width:100%;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);padding:10px 14px;color:var(--text);font-size:15px;outline:none;appearance:none;cursor:pointer}
+    .select-field{width:100%;background:var(--surface2);border:1px solid var(--border-lit);border-radius:var(--radius);padding:10px 14px;color:var(--text);font-size:14px;outline:none;appearance:none;cursor:pointer}
     .select-field:focus{border-color:var(--accent)}
     .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
     .chart-type-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
-    .chart-type-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;background:var(--surface2);border:1.5px solid var(--border-lit);border-radius:var(--radius);color:var(--text-muted);font-size:12px;transition:all var(--trans);cursor:pointer}
+    .chart-type-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;background:var(--surface2);border:1.5px solid var(--border-lit);border-radius:var(--radius);color:var(--text-muted);font-size:11px;transition:all var(--trans);cursor:pointer}
     .chart-type-btn:hover{border-color:var(--accent);color:var(--text)}
     .chart-type-btn.selected{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
     .chart-type-btn svg{width:24px;height:24px}
@@ -350,13 +343,13 @@
     .dropdown{position:relative}
     .dropdown-menu{position:absolute;top:calc(100% + 6px);right:0;background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius);padding:6px;min-width:180px;box-shadow:var(--shadow);z-index:250;display:none}
     .dropdown-menu.open{display:block}
-    .dropdown-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:14px;color:var(--text-muted);cursor:pointer;transition:all var(--trans);border:none;background:transparent;width:100%;text-align:left}
+    .dropdown-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all var(--trans);border:none;background:transparent;width:100%;text-align:left}
     .dropdown-item:hover{background:var(--surface2);color:var(--text)}
     .dropdown-separator{height:1px;background:var(--border);margin:4px 0}
 
     /* Toast */
     .toast-container{position:fixed;bottom:24px;right:24px;z-index:400;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-    .toast{background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius);padding:12px 16px;font-size:14px;color:var(--text);box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;pointer-events:all;animation:slideIn .3s ease;min-width:240px}
+    .toast{background:var(--surface);border:1px solid var(--border-lit);border-radius:var(--radius);padding:12px 16px;font-size:13px;color:var(--text);box-shadow:var(--shadow);display:flex;align-items:center;gap:10px;pointer-events:all;animation:slideIn .3s ease;min-width:240px}
     .toast.success{border-color:rgba(63,185,80,.3)}
     .toast.success::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--success);flex-shrink:0}
     .toast.error{border-color:rgba(248,81,73,.3)}
@@ -364,7 +357,7 @@
     @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
 
     /* Selection bar */
-    .selection-bar{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:100px;padding:10px 20px;box-shadow:var(--shadow),0 0 0 1px var(--accent);z-index:350;align-items:center;gap:16px;font-size:14px}
+    .selection-bar{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:100px;padding:10px 20px;box-shadow:var(--shadow),0 0 0 1px var(--accent);z-index:350;align-items:center;gap:16px;font-size:13px}
     .selection-bar.visible{display:flex}
     .selection-count{font-weight:600;color:var(--accent)}
     .card-checkbox{position:absolute;top:16px;left:16px;width:18px;height:18px;accent-color:var(--accent);cursor:pointer;z-index:5;opacity:0;transition:opacity var(--trans)}
@@ -424,9 +417,9 @@
 <!-- Selection bar -->
 <div class="selection-bar" id="selection-bar">
   <span class="selection-count" id="selection-count">0 selected</span>
-  <button class="btn btn-secondary" onclick="exportSelected('pdf')" style="padding:6px 14px;font-size:13px;">Export PDF</button>
-  <button class="btn btn-secondary" onclick="exportSelected('img')" style="padding:6px 14px;font-size:13px;">Export Image</button>
-  <button class="btn btn-ghost" onclick="clearSelection()" style="padding:6px 12px;font-size:13px;">Cancel</button>
+  <button class="btn btn-secondary" onclick="exportSelected('pdf')" style="padding:6px 14px;font-size:12px;">Export PDF</button>
+  <button class="btn btn-secondary" onclick="exportSelected('img')" style="padding:6px 14px;font-size:12px;">Export Image</button>
+  <button class="btn btn-ghost" onclick="clearSelection()" style="padding:6px 12px;font-size:12px;">Cancel</button>
 </div>
 
 <!-- Add chart modal -->
@@ -497,7 +490,7 @@
     <div class="upload-card">
       <div class="privacy-notice" style="margin-bottom:20px">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>AI can make mistakes, please double-check responses. Your raw data never leaves your browser, only derived statistics are uploaded. <a href="https://github.com/NCTjinn/Insight/" target="_blank">Learn more →</a></span>
+        <span>Your raw data never leaves your device. Only derived statistics are sent to our API for AI summaries. <a href="https://github.com/NCTjinn/Insight/" target="_blank">Learn more →</a></span>
       </div>
 
       <div class="upload-tabs" role="tablist">
@@ -572,12 +565,12 @@
       </div>
     </div>
     <div class="topbar-right">
-      <button class="btn btn-ghost" onclick="showPage('upload')" style="font-size:13px;padding:6px 12px">
+      <button class="btn btn-ghost" onclick="showPage('upload')" style="font-size:12px;padding:6px 12px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
         <span>Home</span>
       </button>
       <div class="dropdown" id="export-dropdown">
-        <button class="btn btn-ghost" style="font-size:13px;padding:6px 12px" onclick="toggleDropdown('export-dropdown')">
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 12px" onclick="toggleDropdown('export-dropdown')">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Export</span>
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -595,7 +588,7 @@
           </button>
         </div>
       </div>
-      <button class="btn btn-secondary" onclick="saveSession()" style="font-size:13px;padding:6px 14px">
+      <button class="btn btn-secondary" onclick="saveSession()" style="font-size:12px;padding:6px 14px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span>Save Session</span>
       </button>
@@ -635,18 +628,18 @@
             </div>
           </div>
           <div class="date-picker-actions">
-            <button class="btn btn-ghost" style="font-size:13px;padding:5px 12px" onclick="clearDateRange()">Clear</button>
-            <button class="btn btn-primary" style="font-size:13px;padding:5px 14px" onclick="applyCustomRange()">Apply</button>
+            <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px" onclick="clearDateRange()">Clear</button>
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 14px" onclick="applyCustomRange()">Apply</button>
           </div>
         </div>
       </div>
     </div>
     <div class="dash-toolbar-right">
-      <button class="btn btn-ghost" onclick="autoGenerateChart()" style="font-size:13px;padding:6px 14px">
+      <button class="btn btn-ghost" onclick="autoGenerateChart()" style="font-size:12px;padding:6px 14px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2z"/></svg>
         Auto Generate
       </button>
-      <button class="btn btn-primary" onclick="openModal()" style="font-size:13px;padding:6px 14px">
+      <button class="btn btn-primary" onclick="openModal()" style="font-size:12px;padding:6px 14px">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Add Chart
       </button>
@@ -656,7 +649,7 @@
   <div style="padding:0 32px 12px">
     <div class="privacy-notice">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-      <span>AI can make mistakes, please double-check responses. Your raw data never leaves your browser, only derived statistics are uploaded. <a href="https://github.com/NCTjinn/Insight/" target="_blank">Learn more →</a></span>
+      <span>Your raw data is processed locally and never uploaded. Only derived statistics are sent to the AI for summaries. &nbsp;<a href="https://github.com/NCTjinn/Insight/" target="_blank">View Privacy Policy on GitHub →</a></span>
     </div>
   </div>
 
@@ -1028,12 +1021,12 @@ function buildCardDOM(entry){
 /* --- REFINED getChartData in index.html --- */
 function getChartData(entry) {
   const ds = state.parsedDataset;
-  if (!ds) return { labels: [], values: [], raw: { peak: null, crash: null } };
+  if (!ds) return { labels: [], values: [] };
 
   const xCol = ds.columns.find(c => c.name === entry.xColumn);
   const yCol = ds.columns.find(c => c.name === entry.yColumn);
   
-  if (!xCol || !yCol) return { labels: [], values: [], raw: { peak: null, crash: null } };
+  if (!xCol || !yCol) return { labels: [], values: [] };
 
   let labels = xCol.labels;
   let values = yCol.values.map(v => typeof v === 'number' ? v : parseFloat(v) || 0);
@@ -1064,18 +1057,7 @@ function getChartData(entry) {
   const finalLabels = Array.from(aggMap.keys());
   const finalValues = Array.from(aggMap.values());
 
-  const raw = { peak: null, crash: null };
-  if (finalValues.length > 0) {
-    const maxVal = Math.max(...finalValues);
-    const minVal = Math.min(...finalValues);
-    const maxIdx = finalValues.indexOf(maxVal);
-    const minIdx = finalValues.indexOf(minVal);
-    
-    if (maxIdx !== -1) raw.peak = { label: finalLabels[maxIdx], value: maxVal };
-    if (minIdx !== -1) raw.crash = { label: finalLabels[minIdx], value: minVal };
-  }
-
-  return { labels: finalLabels, values: finalValues, raw };
+  return { labels: finalLabels, values: finalValues };
 }
 
 function dateDiffDays(from,to){
@@ -1087,7 +1069,7 @@ function dateDiffDays(from,to){
 ============================================================ */
 function initApexChart(entry){
   const d=document.documentElement.getAttribute('data-theme')==='dark';
-  const{labels,values,raw}=getChartData(entry);
+  const{labels,values}=getChartData(entry);
   const ac='#00d4aa',ac2='#f59e0b',dng='#f85149',suc='#3fb950';
 
   // Smart value formatter: detect currency vs plain number vs large int
@@ -1134,23 +1116,15 @@ function initApexChart(entry){
       }
     };
   } else {
-    const pts=[];
-    if(raw.peak  &&labels.includes(raw.peak.label))  pts.push(mkAnn(raw.peak.label,  raw.peak.value,  suc,'▲ Peak'));
-    if(raw.crash &&labels.includes(raw.crash.label)) pts.push(mkAnn(raw.crash.label, raw.crash.value, dng,'▼ Low'));
     opts={...base,series:[{name:entry.yColumn||entry.title,data:values}],
       xaxis:{categories:labels,labels:{style:{fontSize:'11px',fontFamily:"'Outfit',sans-serif"},rotate:-30,rotateAlways:labels.length>12},axisBorder:{show:false},axisTicks:{show:false}},
       yaxis:{labels:{style:{fontSize:'11px',fontFamily:"'Outfit',sans-serif"},formatter:fmt}},
       colors:entry.type==='bar'?[ac,ac2,'#0099ff','#7c3aed',suc,dng]:[ac],
       fill:entry.type==='area'?{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:.4,opacityTo:.01,stops:[0,100]}}:{},
-      plotOptions:entry.type==='bar'?{bar:{borderRadius:4,columnWidth:'55%',distributed:true}}:{},
-      annotations:{points:pts}};
+      plotOptions:entry.type==='bar'?{bar:{borderRadius:4,columnWidth:'55%',distributed:true}}:{}};
   }
   const el=document.getElementById('apex-'+entry.id);if(!el)return;
   const apex=new ApexCharts(el,opts);apex.render();entry.apexInstance=apex;
-}
-
-function mkAnn(x,y,color,text){
-  return{x,y,marker:{size:6,fillColor:color,strokeColor:color},label:{text,style:{background:color+'22',color,fontFamily:"'Outfit',sans-serif",fontSize:'10px'}}};
 }
 
 function updateAllCharts(){
@@ -1169,6 +1143,7 @@ function setTimeRange(btn,range){
   document.querySelectorAll('.time-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');state.timeRange=range;state.customDateRange=null;
   updateAllCharts();closeDatePopover();
+  refreshSummaryButtonLabels();
 }
 function toggleDatePicker() {
   document.getElementById('date-picker-popover').classList.toggle('open');
@@ -1194,6 +1169,7 @@ function applyCustomRange(){
 
   updateAllCharts();
   closeDatePopover();
+  refreshSummaryButtonLabels();
   showToast('Range applied','success');
 }
 document.addEventListener('click', e => {
@@ -1228,147 +1204,189 @@ function toggleCardSize(id){
 
 // ── Replace this with your Cloud Run service URL after deployment ──────────────
 // e.g. 'https://insight-backend-abc123-as.a.run.app'
-const BACKEND_URL = 'https://insight-backend-54324702893.asia-southeast1.run.app';   // empty = backend not yet deployed
+const BACKEND_URL = 'https://insight-backend-54324702893.asia-southeast1.run.app';
 
-// In-memory cache: chartId → summary response (avoids repeated API calls)
+// Cache keyed by "chartId:timeRangeKey" — never wiped on clear, only on explicit
+// cache invalidation. This means switching ranges and back re-uses prior results.
 const _summaryCache = {};
 
-async function generateSummary(id){
-  const entry=state.charts.find(c=>c.id===id); if(!entry)return;
+/** Returns a stable string key for the current time range selection. */
+function getTimeRangeKey() {
+  if (state.timeRange === 'CUSTOM' && state.customDateRange) {
+    return `CUSTOM:${state.customDateRange.from}|${state.customDateRange.to}`;
+  }
+  return state.timeRange; // '1M' | '3M' | '6M' | '1Y' | 'ALL'
+}
 
-  // Restore from cache if available
-  if(_summaryCache[id]){
-    applySummary(id, entry, _summaryCache[id]); return;
+/** Human-readable label for the current range, shown in the summary header. */
+function getTimeRangeLabel(key) {
+  if (!key || key === 'ALL') return 'All time';
+  if (key.startsWith('CUSTOM:')) {
+    const [from, to] = key.replace('CUSTOM:', '').split('|');
+    return `${from} – ${to}`;
+  }
+  const map = { '1M': 'Last month', '3M': 'Last 3 months', '6M': 'Last 6 months', '1Y': 'Last year' };
+  return map[key] || key;
+}
+
+/**
+ * Compute summary statistics from an already-filtered values array.
+ * Mirrors the worker's computeNumericStats so the AI sees range-accurate numbers.
+ */
+function computeFilteredStats(values) {
+  const nums = values.filter(v => typeof v === 'number' && isFinite(v));
+  if (nums.length === 0) return null;
+  const n = nums.length;
+  const sorted = [...nums].sort((a, b) => a - b);
+  const mean = nums.reduce((s, v) => s + v, 0) / n;
+  const median = n % 2 === 0
+    ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2
+    : sorted[Math.floor(n / 2)];
+  const std = Math.sqrt(nums.reduce((s, v) => s + (v - mean) ** 2, 0) / n);
+  const min = sorted[0];
+  const max = sorted[n - 1];
+  // Linear regression slope for trend
+  const xMean = (n - 1) / 2;
+  const ssX = nums.reduce((s, _, x) => s + (x - xMean) ** 2, 0);
+  const slope = ssX === 0 ? 0
+    : nums.reduce((s, y, x) => s + (x - xMean) * (y - mean), 0) / ssX;
+  const relSlope = mean !== 0 ? Math.abs(slope / mean) : 0;
+  const trend = relSlope < 0.005 ? 'stable' : slope > 0 ? 'upward' : 'downward';
+  const growth_rate = (nums[0] !== 0 && nums[0] != null)
+    ? ((nums[n - 1] - nums[0]) / Math.abs(nums[0])) * 100
+    : null;
+  return {
+    mean: +mean.toFixed(4),
+    median: +median.toFixed(4),
+    std: +std.toFixed(4),
+    min, max, trend,
+    growth_rate: growth_rate != null ? +growth_rate.toFixed(2) : null,
+    row_count: n,
+  };
+}
+
+async function generateSummary(id) {
+  const entry = state.charts.find(c => c.id === id);
+  if (!entry) return;
+
+  const rangeKey  = getTimeRangeKey();
+  const cacheKey  = `${id}:${rangeKey}`;
+
+  // ── Cache hit: serve stored result, no API call ──────────────────────────────
+  if (_summaryCache[cacheKey]) {
+    applySummary(id, entry, _summaryCache[cacheKey], rangeKey);
+    return;
   }
 
-  document.getElementById('ai-btn-'+id).style.display='none';
-  document.getElementById('ai-skeleton-'+id).classList.add('visible');
-  document.getElementById('ai-error-'+id).classList.remove('visible');
+  document.getElementById('ai-btn-' + id).style.display = 'none';
+  document.getElementById('ai-skeleton-' + id).classList.add('visible');
+  document.getElementById('ai-error-' + id).classList.remove('visible');
 
   try {
-    let result;
-
-    // ── REAL BACKEND PATH ──────────────────────────────────────────────────────
-    if(BACKEND_URL && state.parsedDataset && entry.yColumn){
-      const ds      = state.parsedDataset;
-      const yStats  = ds.derivedData[entry.yColumn];
-
-      if(!yStats || yStats.type === 'categorical'){
-        throw new Error('No numeric statistics available for this column.');
-      }
-
-      // Resolve x-axis labels at peak/trough index for context
-      const xCol       = ds.columns.find(c=>c.name===entry.xColumn);
-      const peakIdx    = yStats.peak_index;
-      const troughIdx  = yStats.trough_index;
-      const peakLabel  = xCol && peakIdx   != null ? xCol.labels[peakIdx]   : null;
-      const troughLabel= xCol && troughIdx != null ? xCol.labels[troughIdx] : null;
-      const xSample    = xCol ? xCol.labels.filter((_,i)=>i%Math.ceil(xCol.labels.length/20)===0).slice(0,20) : [];
-
-      const body = {
-        chart_title:  entry.title,
-        chart_type:   entry.type,
-        x_column:     entry.xColumn,
-        y_column:     entry.yColumn,
-        y_stats:      yStats,
-        peak_label:   peakLabel,
-        trough_label: troughLabel,
-        x_sample:     xSample,
-      };
-
-      console.log('[Insight] Calling backend /summarise with derived stats:', body);
-
-      const res = await fetch(BACKEND_URL + '/summarise', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(body),
-        signal:  AbortSignal.timeout(25000),  // 25 s timeout
-      });
-
-      if(!res.ok){
-        const err = await res.json().catch(()=>({detail:'Unknown error'}));
-        throw new Error(`Backend ${res.status}: ${err.detail||res.statusText}`);
-      }
-
-      const data = await res.json();
-      console.log('[Insight] Backend response:', data);
-
-      // Map backend schema to internal summary descriptor
-      result = {
-        text:       formatSummaryHTML(data),
-        hasPeak:    data.peak?.detected  && data.peak.label  != null,
-        peakLabel:  data.peak?.label,
-        peakValue:  data.peak?.value,
-        hasCrash:   data.crash?.detected && data.crash.label != null,
-        crashLabel: data.crash?.label,
-        crashValue: data.crash?.value,
-        fromBackend: true,
-        highlights:  data.highlights || [],
-      };
-    }
-    else {
-      throw new Error('No backend URL configured and no dataset loaded.');
+    if (!BACKEND_URL || !state.parsedDataset || !entry.yColumn) {
+      throw new Error('No backend URL configured or no dataset loaded.');
     }
 
-    _summaryCache[id] = result;
-    applySummary(id, entry, result);
+    const ds = state.parsedDataset;
+
+    // Use the FILTERED data for this time range, not the full-dataset derivedData
+    const { labels: filteredLabels, values: filteredValues } = getChartData(entry);
+    const yStats = computeFilteredStats(filteredValues);
+
+    if (!yStats) {
+      throw new Error('No numeric data available for the selected time range.');
+    }
+
+    const xSample = filteredLabels.filter((_, i) =>
+      i % Math.ceil(filteredLabels.length / 20) === 0
+    ).slice(0, 20);
+
+    const body = {
+      chart_title: entry.title,
+      chart_type:  entry.type,
+      x_column:    entry.xColumn,
+      y_column:    entry.yColumn,
+      y_stats:     yStats,
+      x_sample:    xSample,
+    };
+
+    console.log('[Insight] Calling backend /summarise for range', rangeKey, body);
+
+    const res = await fetch(BACKEND_URL + '/summarise', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+      signal:  AbortSignal.timeout(25000),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+      throw new Error(`Backend ${res.status}: ${err.detail || res.statusText}`);
+    }
+
+    const data = await res.json();
+    console.log('[Insight] Backend response:', data);
+
+    const result = {
+      text:        formatSummaryHTML(data),
+      fromBackend: true,
+      highlights:  data.highlights || [],
+      rangeKey,               // store which range this was generated for
+    };
+
+    _summaryCache[cacheKey] = result;
+    applySummary(id, entry, result, rangeKey);
 
   } catch (err) {
     console.error('[Insight] AI error:', err);
     document.getElementById('ai-skeleton-' + id).classList.remove('visible');
     document.getElementById('ai-error-' + id).classList.add('visible');
-    
-    // Re-enable the button so the user can try again 
     const btn = document.getElementById('ai-btn-' + id);
     btn.style.display = 'flex';
     btn.innerHTML = '<span class="ai-icon">↻</span> Retry AI summary';
   }
 }
 
-/** Render the Gemini response into HTML, highlighting peak/crash tokens */
-function formatSummaryHTML(data){
+/** Render the Gemini response into display HTML. */
+function formatSummaryHTML(data) {
   let text = data.summary || '';
-
-  // Bold any numeric patterns that look like key values
+  // Bold numeric patterns
   text = text.replace(/(\d[\d,]*\.?\d*%?)/g, '<strong>$1</strong>');
-
-  // Append highlights as a compact list if present
-  if(data.highlights && data.highlights.length){
-    text += '<ul style="margin:8px 0 0 0;padding-left:16px;font-size:12px;color:var(--text-muted);">'
-      + data.highlights.map(h=>`<li>${h}</li>`).join('')
+  // Append highlights list
+  if (data.highlights && data.highlights.length) {
+    text += '<ul style="margin:8px 0 0 0;padding-left:16px;font-size:13px;color:var(--text-muted);">'
+      + data.highlights.map(h => `<li>${h}</li>`).join('')
       + '</ul>';
   }
-
-  // Inline peak/crash badges
-  if(data.peak?.detected && data.peak.label){
-    const badge=`<span class="ai-highlight-peak">▲ Peak: ${data.peak.label}${data.peak.value!=null?' — '+Number(data.peak.value).toLocaleString():''}</span>`;
-    text = text.replace(data.peak.label, badge);
-  }
-  if(data.crash?.detected && data.crash.label){
-    const badge=`<span class="ai-highlight-crash">▼ Low: ${data.crash.label}${data.crash.value!=null?' — '+Number(data.crash.value).toLocaleString():''}</span>`;
-    text = text.replace(data.crash.label, badge);
-  }
-
   return text;
 }
 
-function applySummary(id, entry, sd){
-  document.getElementById('ai-skeleton-'+id).classList.remove('visible');
-  entry.summaryText   = sd.text;
-  entry.summaryLoaded = true;
+function applySummary(id, entry, sd, rangeKey) {
+  document.getElementById('ai-skeleton-' + id).classList.remove('visible');
+  entry.summaryText          = sd.text;
+  entry.summaryLoaded        = true;
+  entry.summaryRangeKey      = rangeKey;   // track which range is currently displayed
 
-  const label = sd.fromBackend ? 'AI Analysis — Gemini' : 'Data Analysis — Statistics';
+  const rangeLabel = getTimeRangeLabel(rangeKey);
   const box = document.getElementById('ai-summary-' + id);
-  box.innerHTML=`
+  box.innerHTML = `
     <div class="ai-summary-header">
-      <div class="ai-label"><div class="ai-label-dot"></div> ${label}</div>
+      <div class="ai-label">
+        <div class="ai-label-dot"></div> AI Analysis
+        <span class="ai-range-pill">${rangeLabel}</span>
+      </div>
       <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="clearSummary('${id}')">Clear</button>
     </div>
     <p class="ai-summary-text">${sd.text}</p>`;
   box.classList.add('visible');
-  if(sd.hasPeak || sd.hasCrash) addAnnotationsFromSummary(entry, sd);
+  document.getElementById('ai-btn-' + id).style.display = 'none';
 }
 
+/**
+ * Clear only hides the displayed summary and reveals the generate button.
+ * The cache is intentionally left intact — if the user regenerates for the
+ * same time range it will be served from cache without an API call.
+ */
 function clearSummary(id) {
   const entry = state.charts.find(c => c.id === id);
   if (!entry) return;
@@ -1376,35 +1394,42 @@ function clearSummary(id) {
   const box = document.getElementById('ai-summary-' + id);
   const btn = document.getElementById('ai-btn-' + id);
 
-  // 1. Reset state
-  entry.summaryLoaded = false;
-  entry.summaryText = null;
-  delete _summaryCache[id];
+  entry.summaryLoaded   = false;
+  entry.summaryText     = null;
+  entry.summaryRangeKey = null;
 
-  // 2. Clear DOM content to remove "ghost" text
   box.innerHTML = '';
   box.classList.remove('visible');
 
-  // 3. Re-show the generate button
-  if (btn) btn.style.display = 'flex';
-  
-  // 4. Remove chart annotations if any
-  if (entry.apexInstance) {
-    entry.apexInstance.updateOptions({ annotations: { points: [] } }, false, false);
+  if (btn) {
+    btn.style.display = 'flex';
+    // Hint that a cache exists for the current range (no API needed)
+    const currentKey = `${id}:${getTimeRangeKey()}`;
+    if (_summaryCache[currentKey]) {
+      btn.innerHTML = '<span class="ai-icon">✦</span> Restore AI summary';
+    } else {
+      btn.innerHTML = '<span class="ai-icon">✦</span> Generate AI summary';
+    }
   }
 }
 
-function addAnnotationsFromSummary(entry,sd){
-  if(!entry.apexInstance||entry.type==='donut')return;
-  const pts=[];
-  if(sd.hasPeak  &&sd.peakLabel)  pts.push(mkAnn(sd.peakLabel,  sd.peakValue,  '#3fb950','▲ Peak'));
-  if(sd.hasCrash &&sd.crashLabel) pts.push(mkAnn(sd.crashLabel, sd.crashValue, '#f85149','▼ Low'));
-  entry.apexInstance.updateOptions({annotations:{points:pts}},false,false);
+/**
+ * After a time range change, update every visible "Generate" button label
+ * to either "Restore AI summary" (cache hit for new range) or the default.
+ * Charts that already have a summary displayed are left untouched.
+ */
+function refreshSummaryButtonLabels() {
+  state.charts.forEach(entry => {
+    if (entry.summaryLoaded) return;  // summary is showing — don't touch the button
+    const btn = document.getElementById('ai-btn-' + entry.id);
+    if (!btn || btn.style.display === 'none') return;
+    const cacheKey = `${entry.id}:${getTimeRangeKey()}`;
+    btn.innerHTML = _summaryCache[cacheKey]
+      ? '<span class="ai-icon">✦</span> Restore AI summary'
+      : '<span class="ai-icon">✦</span> Generate AI summary';
+  });
 }
 
-/* ============================================================
-   AUTO GENERATE
-============================================================ */
 let autoIdx=0;
 function autoGenerateChart(){
   if(state.parsedDataset){
@@ -1508,19 +1533,17 @@ async function exportCardPDF(id) {
   await new Promise(r => setTimeout(r, 400));
 
   try {
-    const canvas = await html2canvas(card, {
+    const dataUrl = await domtoimage.toPng(card, {
       scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff'
+      bgcolor: '#ffffff'
     });
 
     const { jsPDF } = window.jspdf;
-    const imgData = canvas.toDataURL('image/png', 1.0);
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pdfHeight = (card.offsetHeight * pdfWidth) / card.offsetWidth;
 
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
     pdf.save(`Insight-${id}.pdf`);
   } finally {
     card.classList.remove('is-capturing');
@@ -1554,16 +1577,14 @@ async function exportCardImage(id) {
   await new Promise(r => setTimeout(r, 400));
 
   try {
-    const canvas = await html2canvas(card, {
+    const dataUrl = await domtoimage.toPng(card, {
       scale: 3,
-      useCORS: true,
-      backgroundColor: '#ffffff', // Always white background
-      logging: false
+      bgcolor: '#ffffff'
     });
 
     const a = document.createElement('a');
     a.download = `Insight-${id}.png`;
-    a.href = canvas.toDataURL('image/png', 1.0);
+    a.href = dataUrl;
     a.click();
   } finally {
     // 2. Revert to original theme
@@ -1622,17 +1643,15 @@ async function exportAllPDF() {
 
     await new Promise(r => setTimeout(r, 300)); // Delay for rendering stability
 
-    const canvas = await html2canvas(card, {
+    const dataUrl = await domtoimage.toPng(card, {
       scale: 2,
-      useCORS: true,
-      backgroundColor: bgColor
+      bgcolor: bgColor
     });
 
-    const imgData = canvas.toDataURL('image/png', 1.0);
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pdfHeight = (card.offsetHeight * pdfWidth) / card.offsetWidth;
 
     if (i > 0) pdf.addPage();
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
 
     // Cleanup current card before moving to next
     card.classList.remove('is-capturing');
@@ -1696,10 +1715,15 @@ function loadSession(session){
   session.charts.forEach(cfg=>{
     const entry=addChart({title:cfg.title,type:cfg.type,xColumn:cfg.xColumn,yColumn:cfg.yColumn});
     if(cfg.summaryText){
-      entry.summaryText=cfg.summaryText;entry.summaryLoaded=true;
+      // Restore into the cache under a SESSION key so it can be served without an API call
+      const sessionRangeKey = 'SESSION';
+      const cacheKey = `${entry.id}:${sessionRangeKey}`;
+      const cached = { text: cfg.summaryText, fromBackend: true, highlights: [], rangeKey: sessionRangeKey };
+      _summaryCache[cacheKey] = cached;
+      entry.summaryText=cfg.summaryText;entry.summaryLoaded=true;entry.summaryRangeKey=sessionRangeKey;
       requestAnimationFrame(()=>{
         const box=document.getElementById('ai-summary-'+entry.id);if(!box)return;
-        box.innerHTML=`<div class="ai-summary-header"><div class="ai-label"><div class="ai-label-dot"></div> AI Analysis — Cached</div><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="clearSummary('${entry.id}')">Clear</button></div><p class="ai-summary-text">${cfg.summaryText}</p>`;
+        box.innerHTML=`<div class="ai-summary-header"><div class="ai-label"><div class="ai-label-dot"></div> AI Analysis <span class="ai-range-pill">Saved session</span></div><button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="clearSummary('${entry.id}')">Clear</button></div><p class="ai-summary-text">${cfg.summaryText}</p>`;
         box.classList.add('visible');document.getElementById('ai-btn-'+entry.id).style.display='none';
       });
     }
