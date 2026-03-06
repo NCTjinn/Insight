@@ -886,7 +886,7 @@ function themeOpts(){
 /* ============================================================
    SPA NAVIGATION
 ============================================================ */
-function showPage(n){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+n).classList.add('active');window.scrollTo(0,0)}
+function showPage(n){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.getElementById('page-'+n).classList.add('active');window.scrollTo(0,0);if(n==='upload'){const fi=document.querySelector('#dropzone input[type="file"]');if(fi)fi.value='';const si=document.querySelector('#tab-session input[type="file"]');if(si)si.value='';}}
 function switchUploadTab(btn,id){document.querySelectorAll('.upload-tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));btn.classList.add('active');document.getElementById(id).classList.add('active')}
 
 /* ============================================================
@@ -1151,11 +1151,24 @@ function initApexChart(entry){
 }
 
 function updateAllCharts(){
+  const ac='#00d4aa',ac2='#f59e0b',suc='#3fb950',dng='#f85149';
   state.charts.forEach(entry=>{
     if(!entry.apexInstance)return;
     const{labels,values}=getChartData(entry);
-    if(entry.type==='donut')entry.apexInstance.updateSeries(values);
-    else{entry.apexInstance.updateSeries([{data:values}]);entry.apexInstance.updateOptions({xaxis:{categories:labels}})}
+    if(entry.type==='donut'){
+      entry.apexInstance.updateSeries(values);
+    } else if(entry.type==='bar'){
+      // Distributed bar charts require a single atomic updateOptions — separate
+      // updateSeries + updateOptions calls race and silently drop the re-render.
+      entry.apexInstance.updateOptions({
+        series:[{name:entry.yColumn||entry.title,data:values}],
+        xaxis:{categories:labels},
+        colors:[ac,ac2,'#0099ff','#7c3aed',suc,dng]
+      },false,true);
+    } else {
+      entry.apexInstance.updateSeries([{name:entry.yColumn||entry.title,data:values}]);
+      entry.apexInstance.updateOptions({xaxis:{categories:labels}});
+    }
   });
 }
 
