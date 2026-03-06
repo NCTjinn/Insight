@@ -199,20 +199,17 @@
 
     /* --- Export Refinements --- */
     .chart-card.is-capturing {
-      border-radius: 0 !important; 
+      border-radius: 0 !important;
+      overflow: hidden !important;   /* clips card-inner radius + prevents bg bleed */
       box-shadow: none !important;
       border: 1px solid #30363d !important;
       transition: none !important;
     }
 
-    /* Hide interactive UI elements during capture */
-    .chart-card.is-capturing .card-checkbox,
-    .chart-card.is-capturing .card-actions,
-    .chart-card.is-capturing .ai-generate-btn,
-    .chart-card.is-capturing .card-title-hint,
-    .chart-card.is-capturing .drag-handle,
-    .chart-card.is-capturing .ai-label-dot {
-      display: none !important;
+    /* Also flatten the inner wrapper's radius so no ghost corners appear */
+    .chart-card.is-capturing .card-inner {
+      border-radius: 0 !important;
+      overflow: hidden !important;
     }
 
     /* Remove empty box before summary is generated */
@@ -221,10 +218,22 @@
       display: none !important;
     }
 
-    /* Force the background and text colors to the light-mode variables during capture */
+    /* Hide interactive UI elements during capture (consolidated, no duplicates) */
+    .chart-card.is-capturing .card-checkbox,
+    .chart-card.is-capturing .card-actions,
+    .chart-card.is-capturing .ai-generate-btn,
+    .chart-card.is-capturing .card-title-hint,
+    .chart-card.is-capturing .drag-handle,
+    .chart-card.is-capturing .ai-label-dot,
+    .chart-card.is-capturing .ai-skeleton,
+    .chart-card.is-capturing .ai-summary-header .btn {
+      display: none !important;
+    }
+
+    /* Force the background and text colors to the light-mode values during capture */
     [data-theme="dark"] .chart-card.is-capturing {
-      background: #ffffff !important; /* Force white background */
-      color: #111827 !important;     /* Force dark text */
+      background: #ffffff !important;
+      color: #111827 !important;
       border-color: #e5e7eb !important;
     }
 
@@ -240,18 +249,26 @@
       color: #111827 !important;
     }
 
-    [data-theme="dark"] .chart-card.is-capturing .ai-label {
-      color: #008f72 !important; /* Use light-mode accent */
+    /* Fix: strong tags inherit the dark --text variable — force dark in light export */
+    [data-theme="dark"] .chart-card.is-capturing .ai-summary-text strong {
+      color: #111827 !important;
     }
 
-    /* Hide interactive elements and UNGENERATED summary buttons during export */
-    .chart-card.is-capturing .card-checkbox,
-    .chart-card.is-capturing .card-actions,
-    .chart-card.is-capturing .ai-generate-btn,
-    .chart-card.is-capturing .card-title-hint,
-    .chart-card.is-capturing .drag-handle,
-    .chart-card.is-capturing .ai-skeleton {
-      display: none !important;
+    /* Fix: list items inside summary use inline color:var(--text-muted) — override */
+    [data-theme="dark"] .chart-card.is-capturing .ai-summary-box ul,
+    [data-theme="dark"] .chart-card.is-capturing .ai-summary-box li {
+      color: #374151 !important;
+    }
+
+    /* Fix: ai-label dot and range pill still reference dark-mode accent */
+    [data-theme="dark"] .chart-card.is-capturing .ai-label {
+      color: #008f72 !important;
+    }
+
+    [data-theme="dark"] .chart-card.is-capturing .ai-range-pill {
+      color: #008f72 !important;
+      background: rgba(0,143,114,0.1) !important;
+      border-color: rgba(0,143,114,0.4) !important;
     }
 
     /* Ensure the card expands to fit its content during capture */
