@@ -202,7 +202,8 @@
       border-radius: 0 !important;
       overflow: hidden !important;   /* clips card-inner radius + prevents bg bleed */
       box-shadow: none !important;
-      border: 1px solid #30363d !important;
+      border: none !important;       /* remove border entirely so no edge artifact */
+      background: #ffffff !important; /* explicit white — prevents page bg bleed in any theme */
       transition: none !important;
     }
 
@@ -210,6 +211,7 @@
     .chart-card.is-capturing .card-inner {
       border-radius: 0 !important;
       overflow: hidden !important;
+      background: #ffffff !important;
     }
 
     /* Remove empty box before summary is generated */
@@ -869,13 +871,17 @@ function populateAxisDropdowns(columns){
 ============================================================ */
 function toggleTheme(){
   const h=document.documentElement;
-  h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');
+  const next=h.getAttribute('data-theme')==='dark'?'light':'dark';
+  h.setAttribute('data-theme',next);
+  try{localStorage.setItem('insight-theme',next);}catch{}
   state.charts.forEach(c=>{if(c.apexInstance)c.apexInstance.updateOptions(themeOpts(),false,false)});
 }
 function themeOpts(){
   const d=document.documentElement.getAttribute('data-theme')==='dark';
   return{theme:{mode:d?'dark':'light'},chart:{background:'transparent',foreColor:d?'#7d8590':'#6b7280'},grid:{borderColor:d?'#21282f':'#e5e7eb'},tooltip:{theme:d?'dark':'light'}};
 }
+// Restore persisted theme before first paint
+(function(){try{const t=localStorage.getItem('insight-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch{}})();
 
 /* ============================================================
    SPA NAVIGATION
@@ -1557,10 +1563,14 @@ async function exportCardPDF(id) {
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (card.offsetHeight * pdfWidth) / card.offsetWidth;
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const margin = 12;
+    const imgW = pdfW - margin * 2;
+    const imgH = (card.offsetHeight * imgW) / card.offsetWidth;
 
-    pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pdfW, pdf.internal.pageSize.getHeight(), 'F');
+    pdf.addImage(dataUrl, 'PNG', margin, margin, imgW, imgH);
     pdf.save(`Insight-${id}.pdf`);
   } finally {
     card.classList.remove('is-capturing');
@@ -1645,35 +1655,48 @@ async function exportAllPDF() {
 
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
-  const pdfWidth = pdf.internal.pageSize.getWidth();
-  const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0d1117';
+  const pdfW = pdf.internal.pageSize.getWidth();
+  const margin = 12; // mm padding on each side
+  const imgW = pdfW - margin * 2;
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
-  // Use for...of to ensure sequential processing (prevents blank pages)
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
     const entry = state.charts.find(c => c.id === card.id);
-    
+
     card.classList.add('is-capturing');
     if (entry?.apexInstance) {
-      await entry.apexInstance.updateOptions({ chart: { animations: { enabled: false } } }, false, false);
+      await entry.apexInstance.updateOptions({
+        theme: { mode: 'light' },
+        chart: { animations: { enabled: false }, foreColor: '#6b7280' },
+        grid: { borderColor: '#e5e7eb' },
+        tooltip: { theme: 'light' }
+      }, false, false);
     }
 
-    await new Promise(r => setTimeout(r, 300)); // Delay for rendering stability
+    await new Promise(r => setTimeout(r, 400));
 
     const dataUrl = await domtoimage.toPng(card, {
       scale: 2,
-      bgcolor: bgColor
+      bgcolor: '#ffffff'   // always white — never bleed page bg into transparent SVG areas
     });
 
-    const pdfHeight = (card.offsetHeight * pdfWidth) / card.offsetWidth;
+    const imgH = (card.offsetHeight * imgW) / card.offsetWidth;
 
     if (i > 0) pdf.addPage();
-    pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    // White page background so the card sits on a clean surface
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pdfW, pdf.internal.pageSize.getHeight(), 'F');
+    pdf.addImage(dataUrl, 'PNG', margin, margin, imgW, imgH);
 
-    // Cleanup current card before moving to next
     card.classList.remove('is-capturing');
     if (entry?.apexInstance) {
-      entry.apexInstance.updateOptions({ chart: { animations: { enabled: true } } }, false, false);
+      entry.apexInstance.updateOptions({
+        theme: { mode: isDark ? 'dark' : 'light' },
+        chart: { animations: { enabled: true }, foreColor: isDark ? '#7d8590' : '#6b7280' },
+        grid: { borderColor: isDark ? '#21282f' : '#e5e7eb' },
+        tooltip: { theme: isDark ? 'dark' : 'light' }
+      }, false, false);
     }
   }
 
