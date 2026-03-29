@@ -87,13 +87,55 @@ function parseCSVText({ text, fileName }) {
    CORE PROCESSING PIPELINE
 ============================================================ */
 
+/**
+ * Scans the first up to 10 rows to find the actual header row.
+ * A header row is the first row that has ≥2 non-empty cells where the
+ * majority of values are non-numeric strings — and is followed by at
+ * least one non-empty row of data.
+ * Falls back to row 0 if no better candidate is found (normal CSVs).
+ */
+function detectHeaderRow(rows) {
+  const maxScan = Math.min(10, rows.length);
+  for (let i = 0; i < maxScan; i++) {
+    const row = rows[i];
+    const nonEmpty = row.filter(v => v !== '' && v !== null && v !== undefined);
+    if (nonEmpty.length < 2) continue; // need at least 2 columns
+
+    // Count cells that look like header labels (strings that aren't plain numbers)
+    const labelCount = nonEmpty.filter(v => {
+      if (typeof v === 'number') return false;
+      const s = String(v).trim();
+      return s !== '' && isNaN(parseFloat(s));
+    }).length;
+
+    if (labelCount / nonEmpty.length >= 0.5) {
+      // Confirm there's actual data after this row
+      const hasDataAfter = rows.slice(i + 1).some(r =>
+        Array.isArray(r) && r.some(c => c !== '' && c !== null && c !== undefined)
+      );
+      if (hasDataAfter) return i;
+    }
+  }
+  return 0; // default: first row is the header
+}
+
 function processRawRows(rows, fileName) {
   if (!rows || rows.length < 2) {
     throw new Error('File has fewer than 2 rows. Need at least a header row and one data row.');
   }
 
+  // --- 0. Detect header row (handles files with leading metadata rows) ---
+  const headerRowIdx = detectHeaderRow(rows);
+  if (headerRowIdx > 0) {
+    progress(`Metadata detected — using row ${headerRowIdx + 1} as column headers.`);
+  }
+
   // --- 1. Extract headers ---
-  const headers = rows[0].map(h => String(h ?? '').trim()).filter(h => h !== '');
+  const rawHeaders = rows[headerRowIdx].map(h => String(h ?? '').trim());
+  // Clean up testmy.net-style "Date format: ..." prefix in the first column header
+  const headers = rawHeaders
+    .map(h => h.replace(/^date format:\s*/i, 'Date').trim())
+    .filter(h => h !== '');
   const colCount = headers.length;
 
   if (colCount === 0) throw new Error('No column headers found in the first row.');
@@ -101,7 +143,7 @@ function processRawRows(rows, fileName) {
   progress(`Found ${colCount} column(s): ${headers.join(', ')}`);
 
   // --- 2. Extract data rows (drop fully empty rows) ---
-  let dataRows = rows.slice(1).filter(row =>
+  let dataRows = rows.slice(headerRowIdx + 1).filter(row =>
     row.some(c => c !== '' && c !== null && c !== undefined)
   );
 
@@ -264,6 +306,14 @@ function parseFlexibleDate(v) {
 
   const s = String(v).trim();
   if (!s) return null;
+
+  // testmy.net format: "Sun Mar 29 2026 @ 3:47:37 pm"
+  // The "@" separator breaks the standard Date parser — strip it first.
+  const testmyMatch = s.match(/^(\w+\s+\w+\s+\d+\s+\d{4})\s*@\s*(\d+:\d+:\d+\s*[ap]m)$/i);
+  if (testmyMatch) {
+    const d = new Date(`${testmyMatch[1]} ${testmyMatch[2]}`);
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1900 && d.getFullYear() < 2100) return d;
+  }
 
   // Common date string patterns
   const d = new Date(s);
