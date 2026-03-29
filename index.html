@@ -1057,7 +1057,13 @@ function buildCardDOM(entry){
    Returns { labels, values, raw } for both real and demo data.
    For real data, pairs xColumn (labels) with yColumn (values).
 ============================================================ */
-/* --- REFINED getChartData in index.html --- */
+function getPointLimit(id) {
+  const card = document.getElementById(id);
+  const width = card ? card.offsetWidth : 600;
+  // ~60px per bar/point is a comfortable minimum; clamp between 6 and all data
+  return Math.max(6, Math.floor(width / 60));
+}
+
 function getChartData(entry) {
   const ds = state.parsedDataset;
   if (!ds) return { labels: [], values: [] };
@@ -1129,7 +1135,11 @@ function getChartData(entry) {
   const finalLabels = Array.from(aggMap.keys());
   const finalValues = Array.from(aggMap.values());
 
-  return { labels: finalLabels, values: finalValues };
+  const limit = getPointLimit(entry.id);
+  return {
+    labels: finalLabels.slice(0, limit),
+    values: finalValues.slice(0, limit)
+  };
 }
 
 function dateDiffDays(from,to){
@@ -1265,18 +1275,34 @@ document.addEventListener('click', e => {
 /* ============================================================
    CHART TITLE EDITING
 ============================================================ */
-function updateChartTitle(id,t){
-  const entry=state.charts.find(c=>c.id===id);if(!entry)return;
-  entry.title=t.trim()||entry.title;
-  entry.apexInstance?.updateOptions({series:[{name:entry.title}]});
+function updateChartTitle(id, t) {
+  const entry = state.charts.find(c => c.id === id); if (!entry) return;
+  entry.title = t.trim() || entry.title;
+  if (entry.apexInstance && entry.type !== 'donut') {
+    const { labels, values } = getChartData(entry);
+    entry.apexInstance.updateOptions({
+      series: [{ name: entry.title, data: values }],
+      xaxis: { categories: labels }
+    });
+  }
 }
 
 /* ============================================================
    CARD RESIZE
 ============================================================ */
-function toggleCardSize(id){
+function toggleCardSize(id) {
   document.getElementById(id)?.classList.toggle('full-width');
-  setTimeout(()=>state.charts.find(c=>c.id===id)?.apexInstance?.updateOptions({}),100);
+  setTimeout(() => {
+    const entry = state.charts.find(c => c.id === id);
+    if (!entry?.apexInstance) return;
+    const { labels, values } = getChartData(entry); // now re-slices at new width
+    if (entry.type === 'donut') {
+      entry.apexInstance.updateSeries(values);
+    } else {
+      entry.apexInstance.updateSeries([{ name: entry.yColumn || entry.title, data: values }]);
+      entry.apexInstance.updateOptions({ xaxis: { categories: labels } });
+    }
+  }, 120); // wait for CSS transition to finish so offsetWidth is correct
 }
 
 /* ============================================================
@@ -1972,7 +1998,20 @@ function showToast(msg,type='success'){const t=document.createElement('div');t.c
 ============================================================ */
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();clearSelection();closeAllDropdowns();closeDatePopover()}});
 const _deb=(fn,d)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...a),d)}};
-window.addEventListener('resize',_deb(()=>{state.charts.forEach(c=>{try{c.apexInstance?.updateOptions({})}catch{}})},200));
+
+window.addEventListener('resize', _deb(() => {
+  state.charts.forEach(c => {
+    if (!c.apexInstance) return;
+    const { labels, values } = getChartData(c);
+    if (c.type === 'donut') {
+      c.apexInstance.updateSeries(values);
+    } else {
+      c.apexInstance.updateSeries([{ name: c.yColumn || c.title, data: values }]);
+      c.apexInstance.updateOptions({ xaxis: { categories: labels } });
+    }
+  });
+}, 200));
+
 </script>
 </body>
 </html>
