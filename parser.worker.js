@@ -236,10 +236,18 @@ function analyseColumn({ name, rawValues }) {
   if (role === 'date') {
     const parsed  = rawValues.map(v => parseFlexibleDate(v));
     const valid   = parsed.filter(d => d !== null);
-    const labels  = parsed.map(d => d ? formatDateLabel(d) : '');
+
+    // Upgrade to 'datetime' if ≥10% of parsed values have a non-midnight time component.
+    // This handles columns like "Sun Mar 29 2026 @ 5:00:37 pm" where multiple rows
+    // share the same calendar day but differ by time.
+    const withTime = valid.filter(d => d.getHours() !== 0 || d.getMinutes() !== 0 || d.getSeconds() !== 0);
+    const isDatetime = valid.length > 0 && (withTime.length / valid.length) >= 0.1;
+    const actualRole = isDatetime ? 'datetime' : 'date';
+
+    const labels  = parsed.map(d => d ? (isDatetime ? formatDatetimeLabel(d) : formatDateLabel(d)) : '');
     const values  = parsed.map(d => d ? d.getTime() : null);
 
-    return { name, role, values, labels, stats: null, dateObjects: valid };
+    return { name, role: actualRole, values, labels, stats: null, dateObjects: valid };
   }
 
   // Categorical
@@ -334,6 +342,17 @@ function parseFlexibleDate(v) {
 function formatDateLabel(d) {
   // Returns a short label suitable for chart x-axis
   return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+function formatDatetimeLabel(d) {
+  // Returns a label that includes time — used when multiple rows share the same
+  // calendar day but have different timestamps (role === 'datetime').
+  // Seconds are included to ensure uniqueness for sub-minute data.
+  return d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit',
+    hour12: true,
+  });
 }
 
 /* ============================================================
@@ -485,7 +504,7 @@ function downsampleLTTB(data, threshold) {
 ============================================================ */
 
 function suggestCharts(columns) {
-  const dates      = columns.filter(c => c.role === 'date');
+  const dates      = columns.filter(c => c.role === 'date' || c.role === 'datetime');
   const cats       = columns.filter(c => c.role === 'categorical');
   const numerics   = columns.filter(c => c.role === 'numeric');
   const suggestions = [];
@@ -577,7 +596,7 @@ function buildDerivedData(columns) {
         row_count:      col.values.length,
       };
     }
-    if (col.role === 'date') {
+    if (col.role === 'date' || col.role === 'datetime') {
       const valid = col.dateObjects;
       if (valid && valid.length > 0) {
         const sorted = [...valid].sort((a, b) => a - b);

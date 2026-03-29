@@ -797,7 +797,7 @@ function logParsedDataset(ds){
   ds.columns.forEach((col, i) => {
     const g = `%c  [${i}] "${col.name}"  (${col.role})`;
     const style = col.role==='numeric'   ? 'color:#3fb950;font-weight:600;'
-                : col.role==='date'      ? 'color:#0099ff;font-weight:600;'
+                : col.role==='date' || col.role==='datetime' ? 'color:#0099ff;font-weight:600;'
                 :                          'color:#7d8590;font-weight:600;';
     if(col.role === 'numeric' && col.stats){
       const s = col.stats;
@@ -815,7 +815,7 @@ function logParsedDataset(ds){
         trough_index: s.troughIdx,
       });
       console.groupEnd();
-    } else if(col.role === 'date'){
+    } else if(col.role === 'date' || col.role === 'datetime'){
       console.groupCollapsed(g, style);
       console.log('Labels (first 10):', col.labels.slice(0,10));
       console.groupEnd();
@@ -875,7 +875,7 @@ function populateAxisDropdowns(columns){
     oy.value=col.name; oy.textContent=`${col.name} (${col.role})`;
     ySel.appendChild(oy);
   });
-  // Default: x = first non-numeric, y = first numeric
+  // Default: x = first date/datetime/categorical, y = first numeric
   const xDefault=columns.find(c=>c.role!=='numeric');
   const yDefault=columns.find(c=>c.role==='numeric');
   if(xDefault) xSel.value=xDefault.name;
@@ -1060,8 +1060,14 @@ function buildCardDOM(entry){
 function getPointLimit(id) {
   const card = document.getElementById(id);
   const width = card ? card.offsetWidth : 600;
-  // ~60px per bar/point is a comfortable minimum; clamp between 6 and all data
-  return Math.max(6, Math.floor(width / 60));
+  const entry = state.charts.find(c => c.id === id);
+  const xCol  = entry && state.parsedDataset
+    ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
+    : null;
+  // Datetime axes carry unique per-second timestamps — allow more points so
+  // no measurements are hidden.  Regular date/cat axes use the coarser limit.
+  const pixelsPerPoint = (xCol?.role === 'datetime') ? 30 : 60;
+  return Math.max(6, Math.floor(width / pixelsPerPoint));
 }
 
 function getChartData(entry) {
@@ -1077,8 +1083,8 @@ function getChartData(entry) {
   let values = yCol.values.map(v => typeof v === 'number' ? v : parseFloat(v) || 0);
 
   // 1. Time range slicing
-  if (xCol.role === 'date' && xCol.values.length > 0) {
-    // ── Date x-axis: filter directly on xCol timestamps ──────────────────────
+  if ((xCol.role === 'date' || xCol.role === 'datetime') && xCol.values.length > 0) {
+    // ── Date / Datetime x-axis: filter directly on xCol timestamps ───────────
     const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
     const days = state.timeRange === 'CUSTOM' && state.customDateRange
       ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
@@ -1088,7 +1094,9 @@ function getChartData(entry) {
       let idxs;
       if (state.timeRange === 'CUSTOM' && state.customDateRange) {
         const fromMs = new Date(state.customDateRange.from).getTime();
-        const toMs   = new Date(state.customDateRange.to).getTime();
+        // Add 86399999 ms (23:59:59.999) so the end date is treated as end-of-day,
+        // not midnight — otherwise all same-day datetime rows would be excluded.
+        const toMs   = new Date(state.customDateRange.to).getTime() + 86399999;
         idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= fromMs && v <= toMs).map(({ i }) => i);
       } else {
         const maxDateInData = Math.max(...xCol.values.filter(v => v !== null));
@@ -1112,7 +1120,7 @@ function getChartData(entry) {
         let idxs;
         if (state.timeRange === 'CUSTOM' && state.customDateRange) {
           const fromMs = new Date(state.customDateRange.from).getTime();
-          const toMs   = new Date(state.customDateRange.to).getTime();
+          const toMs   = new Date(state.customDateRange.to).getTime() + 86399999;
           idxs = dateCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= fromMs && v <= toMs).map(({ i }) => i);
         } else {
           const maxDate = Math.max(...dateCol.values.filter(v => v !== null));
@@ -1125,7 +1133,18 @@ function getChartData(entry) {
     }
   }
 
-  // 2. AGGREGATION: Group values by label to prevent chart clutter
+  // 2. AGGREGATION: Group values by label to prevent chart clutter.
+  //    For 'datetime' columns every label already encodes a unique timestamp, so
+  //    aggregation would falsely collapse points that happen to land on the same
+  //    second. Skip it and return the rows as-is.
+  if (xCol.role === 'datetime') {
+    const limit = getPointLimit(entry.id);
+    return {
+      labels: labels.slice(0, limit),
+      values: values.slice(0, limit),
+    };
+  }
+
   const aggMap = new Map();
   labels.forEach((l, i) => {
     const val = values[i] || 0;
@@ -1198,8 +1217,43 @@ function initApexChart(entry){
       }
     };
   } else {
+    // Detect if the x column is a datetime so we can apply smarter axis formatting.
+    const xCol = state.parsedDataset
+      ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
+      : null;
+    const isDatetime = xCol?.role === 'datetime';
+
+    // For datetime axes: determine whether all visible points share the same calendar
+    // day so the axis tick can drop the date portion and show only the time.
+    let xFormatter = undefined;
+    if (isDatetime && labels.length > 0) {
+      const firstDate = labels[0]?.split(',')[0]; // e.g. "Mar 29"
+      const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
+      if (allSameDay) {
+        // All on the same day → show only "5:00:37 PM" on the axis tick
+        xFormatter = (val) => {
+          // val is the full label like "Mar 29, 5:00:37 PM"
+          const timePart = val.replace(/^[A-Za-z]+ \d+,\s*/, '');
+          return timePart;
+        };
+      } else {
+        // Multiple days → show "Mar 29, 5:00 PM" (drop seconds on tick for brevity)
+        xFormatter = (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1');
+      }
+    }
+
     opts={...base,series:[{name:entry.yColumn||entry.title,data:values}],
-      xaxis:{categories:labels,labels:{style:{fontSize:'11px',fontFamily:"'Outfit',sans-serif"},rotate:-30,rotateAlways:labels.length>12},axisBorder:{show:false},axisTicks:{show:false}},
+      xaxis:{
+        categories: labels,
+        labels: {
+          style:       { fontSize:'11px', fontFamily:"'Outfit',sans-serif" },
+          rotate:      -35,
+          rotateAlways: isDatetime || labels.length > 12,
+          formatter:   xFormatter,
+        },
+        axisBorder: { show:false },
+        axisTicks:  { show:false },
+      },
       yaxis:{labels:{style:{fontSize:'11px',fontFamily:"'Outfit',sans-serif"},formatter:fmt}},
       colors:entry.type==='bar'?[ac,ac2,'#0099ff','#7c3aed',suc,dng]:[ac],
       fill:entry.type==='area'?{type:'gradient',gradient:{shadeIntensity:1,opacityFrom:.4,opacityTo:.01,stops:[0,100]}}:{},
@@ -1210,7 +1264,6 @@ function initApexChart(entry){
 }
 
 function updateAllCharts(){
-  const ac='#00d4aa',ac2='#f59e0b',suc='#3fb950',dng='#f85149';
   state.charts.forEach(entry=>{
     if(!entry.apexInstance)return;
     const{labels,values}=getChartData(entry);
@@ -1224,8 +1277,26 @@ function updateAllCharts(){
       entry.apexInstance = null;
       initApexChart(entry);
     } else {
+      // For datetime columns, re-derive the axis formatter so the compact tick
+      // label stays correct after a time-range change (which may shift all points
+      // to a different day or span multiple days).
+      const xCol = state.parsedDataset
+        ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
+        : null;
+      const isDatetime = xCol?.role === 'datetime';
+      let xaxisOpts = { categories: labels };
+      if (isDatetime && labels.length > 0) {
+        const firstDate = labels[0]?.split(',')[0];
+        const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
+        xaxisOpts.labels = {
+          rotateAlways: true,
+          formatter: allSameDay
+            ? (val) => val.replace(/^[A-Za-z]+ \d+,\s*/, '')
+            : (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'),
+        };
+      }
       entry.apexInstance.updateSeries([{name:entry.yColumn||entry.title,data:values}]);
-      entry.apexInstance.updateOptions({xaxis:{categories:labels}});
+      entry.apexInstance.updateOptions({xaxis: xaxisOpts});
     }
   });
 }
@@ -1280,9 +1351,24 @@ function updateChartTitle(id, t) {
   entry.title = t.trim() || entry.title;
   if (entry.apexInstance && entry.type !== 'donut') {
     const { labels, values } = getChartData(entry);
+    const xCol = state.parsedDataset
+      ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
+      : null;
+    const isDatetime = xCol?.role === 'datetime';
+    let xaxisOpts = { categories: labels };
+    if (isDatetime && labels.length > 0) {
+      const firstDate = labels[0]?.split(',')[0];
+      const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
+      xaxisOpts.labels = {
+        rotateAlways: true,
+        formatter: allSameDay
+          ? (val) => val.replace(/^[A-Za-z]+ \d+,\s*/, '')
+          : (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'),
+      };
+    }
     entry.apexInstance.updateOptions({
       series: [{ name: entry.title, data: values }],
-      xaxis: { categories: labels }
+      xaxis: xaxisOpts,
     });
   }
 }
@@ -1299,8 +1385,23 @@ function toggleCardSize(id) {
     if (entry.type === 'donut') {
       entry.apexInstance.updateSeries(values);
     } else {
+      const xCol = state.parsedDataset
+        ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
+        : null;
+      const isDatetime = xCol?.role === 'datetime';
+      let xaxisOpts = { categories: labels };
+      if (isDatetime && labels.length > 0) {
+        const firstDate = labels[0]?.split(',')[0];
+        const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
+        xaxisOpts.labels = {
+          rotateAlways: true,
+          formatter: allSameDay
+            ? (val) => val.replace(/^[A-Za-z]+ \d+,\s*/, '')
+            : (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'),
+        };
+      }
       entry.apexInstance.updateSeries([{ name: entry.yColumn || entry.title, data: values }]);
-      entry.apexInstance.updateOptions({ xaxis: { categories: labels } });
+      entry.apexInstance.updateOptions({ xaxis: xaxisOpts });
     }
   }, 120); // wait for CSS transition to finish so offsetWidth is correct
 }
@@ -2006,8 +2107,23 @@ window.addEventListener('resize', _deb(() => {
     if (c.type === 'donut') {
       c.apexInstance.updateSeries(values);
     } else {
+      const xCol = state.parsedDataset
+        ? state.parsedDataset.columns.find(col => col.name === c.xColumn)
+        : null;
+      const isDatetime = xCol?.role === 'datetime';
+      let xaxisOpts = { categories: labels };
+      if (isDatetime && labels.length > 0) {
+        const firstDate = labels[0]?.split(',')[0];
+        const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
+        xaxisOpts.labels = {
+          rotateAlways: true,
+          formatter: allSameDay
+            ? (val) => val.replace(/^[A-Za-z]+ \d+,\s*/, '')
+            : (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'),
+        };
+      }
       c.apexInstance.updateSeries([{ name: c.yColumn || c.title, data: values }]);
-      c.apexInstance.updateOptions({ xaxis: { categories: labels } });
+      c.apexInstance.updateOptions({ xaxis: xaxisOpts });
     }
   });
 }, 200));
