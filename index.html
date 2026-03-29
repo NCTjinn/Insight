@@ -1232,18 +1232,30 @@ function initApexChart(entry){
       if (allSameDay) {
         // All on the same day → show only "5:00:37 PM" on the axis tick
         xFormatter = (val) => {
+          // Guard: ApexCharts may call the formatter with a numeric index or
+          // undefined for extra ticks; .replace() on a non-string throws TypeError.
+          if (!val || typeof val !== 'string') return val;
           // val is the full label like "Mar 29, 5:00:37 PM"
           const timePart = val.replace(/^[A-Za-z]+ \d+,\s*/, '');
           return timePart;
         };
       } else {
         // Multiple days → show "Mar 29, 5:00 PM" (drop seconds on tick for brevity)
-        xFormatter = (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1');
+        xFormatter = (val) => {
+          if (!val || typeof val !== 'string') return val;
+          return val.replace(/:\d{2}\s*(AM|PM)/i, ' $1');
+        };
       }
     }
 
     opts={...base,series:[{name:entry.yColumn||entry.title,data:values}],
       xaxis:{
+        // Explicitly pin the axis to 'category' mode so ApexCharts does NOT
+        // auto-detect 'datetime' from the label strings (e.g. "Mar 29, 5:00:37 PM").
+        // Without this, line/area charts silently switch to datetime mode, expect
+        // {x,y} pairs, and render completely empty because the series is plain numbers.
+        // Bar charts are unaffected (ApexCharts never auto-promotes a bar axis).
+        type: 'category',
         categories: labels,
         labels: {
           style:       { fontSize:'11px', fontFamily:"'Outfit',sans-serif" },
@@ -1284,15 +1296,15 @@ function updateAllCharts(){
         ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
         : null;
       const isDatetime = xCol?.role === 'datetime';
-      let xaxisOpts = { categories: labels };
+      let xaxisOpts = { type: 'category', categories: labels };
       if (isDatetime && labels.length > 0) {
         const firstDate = labels[0]?.split(',')[0];
         const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
         xaxisOpts.labels = {
           rotateAlways: true,
           formatter: allSameDay
-            ? (val) => val.replace(/^[A-Za-z]+ \d+,\s*/, '')
-            : (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'),
+            ? (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/^[A-Za-z]+ \d+,\s*/, ''); }
+            : (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'); },
         };
       }
       entry.apexInstance.updateSeries([{name:entry.yColumn||entry.title,data:values}]);
@@ -1355,15 +1367,15 @@ function updateChartTitle(id, t) {
       ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
       : null;
     const isDatetime = xCol?.role === 'datetime';
-    let xaxisOpts = { categories: labels };
+    let xaxisOpts = { type: 'category', categories: labels };
     if (isDatetime && labels.length > 0) {
       const firstDate = labels[0]?.split(',')[0];
       const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
       xaxisOpts.labels = {
         rotateAlways: true,
         formatter: allSameDay
-          ? (val) => val.replace(/^[A-Za-z]+ \d+,\s*/, '')
-          : (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'),
+          ? (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/^[A-Za-z]+ \d+,\s*/, ''); }
+          : (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'); },
       };
     }
     entry.apexInstance.updateOptions({
@@ -1389,15 +1401,15 @@ function toggleCardSize(id) {
         ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
         : null;
       const isDatetime = xCol?.role === 'datetime';
-      let xaxisOpts = { categories: labels };
+      let xaxisOpts = { type: 'category', categories: labels };
       if (isDatetime && labels.length > 0) {
         const firstDate = labels[0]?.split(',')[0];
         const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
         xaxisOpts.labels = {
           rotateAlways: true,
           formatter: allSameDay
-            ? (val) => val.replace(/^[A-Za-z]+ \d+,\s*/, '')
-            : (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'),
+            ? (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/^[A-Za-z]+ \d+,\s*/, ''); }
+            : (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'); },
         };
       }
       entry.apexInstance.updateSeries([{ name: entry.yColumn || entry.title, data: values }]);
@@ -2111,15 +2123,15 @@ window.addEventListener('resize', _deb(() => {
         ? state.parsedDataset.columns.find(col => col.name === c.xColumn)
         : null;
       const isDatetime = xCol?.role === 'datetime';
-      let xaxisOpts = { categories: labels };
+      let xaxisOpts = { type: 'category', categories: labels };
       if (isDatetime && labels.length > 0) {
         const firstDate = labels[0]?.split(',')[0];
         const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
         xaxisOpts.labels = {
           rotateAlways: true,
           formatter: allSameDay
-            ? (val) => val.replace(/^[A-Za-z]+ \d+,\s*/, '')
-            : (val) => val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'),
+            ? (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/^[A-Za-z]+ \d+,\s*/, ''); }
+            : (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'); },
         };
       }
       c.apexInstance.updateSeries([{ name: c.yColumn || c.title, data: values }]);
