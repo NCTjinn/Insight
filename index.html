@@ -473,6 +473,12 @@
         <select class="select-field" id="modal-y-axis"></select>
       </div>
     </div>
+    <div class="form-group" style="margin-top:12px" id="modal-groupby-wrap">
+      <label class="input-label">Group By <span style="font-size:10px;color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:400;">(optional — creates multiple series)</span></label>
+      <select class="select-field" id="modal-groupby">
+        <option value="">None (single series)</option>
+      </select>
+    </div>
     <div class="form-group" style="margin-top:12px">
       <label class="input-label">Chart Title</label>
       <input class="input-field" id="modal-title" type="text" placeholder="e.g. Revenue by Month" />
@@ -865,8 +871,10 @@ function setParseStatus(msg){
 function populateAxisDropdowns(columns){
   const xSel=document.getElementById('modal-x-axis');
   const ySel=document.getElementById('modal-y-axis');
+  const gbSel=document.getElementById('modal-groupby');
   xSel.innerHTML='';
   ySel.innerHTML='';
+  gbSel.innerHTML='<option value="">None (single series)</option>';
   columns.forEach(col=>{
     const ox=document.createElement('option');
     ox.value=col.name; ox.textContent=`${col.name} (${col.role})`;
@@ -874,6 +882,12 @@ function populateAxisDropdowns(columns){
     const oy=document.createElement('option');
     oy.value=col.name; oy.textContent=`${col.name} (${col.role})`;
     ySel.appendChild(oy);
+    // Only categorical columns make sense as group-by keys
+    if(col.role==='categorical'){
+      const og=document.createElement('option');
+      og.value=col.name; og.textContent=`${col.name} (${col.role})`;
+      gbSel.appendChild(og);
+    }
   });
   // Default: x = first date/datetime/categorical, y = first numeric
   const xDefault=columns.find(c=>c.role!=='numeric');
@@ -970,6 +984,7 @@ function addChart(opts){
     // Real data keys
     xColumn:  opts.xColumn||null,
     yColumn:  opts.yColumn||null,
+    groupByColumn: opts.groupByColumn||null,
     apexInstance:null,summaryText:null,summaryLoaded:false,
   };
   state.charts.push(entry);
@@ -996,7 +1011,7 @@ function buildCardDOM(entry){
         <div class="card-title-wrap">
           <div class="card-title" contenteditable="true" spellcheck="false"
                onblur="updateChartTitle('${entry.id}',this.textContent)">${entry.title}</div>
-          <div class="card-title-hint">Click title to edit</div>
+          <div class="card-title-hint">${entry.groupByColumn ? `Grouped by <strong>${entry.groupByColumn}</strong>` : 'Click title to edit'}</div>
         </div>
         <div class="card-actions">
           <span class="drag-handle" title="Drag to reorder">
@@ -1166,12 +1181,117 @@ function dateDiffDays(from,to){
 }
 
 /* ============================================================
+   GET COMBINED (MULTI-SERIES) CHART DATA
+   Used when entry.groupByColumn is set.
+   Returns { labels, series: [{name, data}] } where every series
+   shares the same x-axis labels array.
+============================================================ */
+function getCombinedChartData(entry) {
+  const ds = state.parsedDataset;
+  if (!ds) return { labels: [], series: [] };
+
+  const xCol      = ds.columns.find(c => c.name === entry.xColumn);
+  const yCol      = ds.columns.find(c => c.name === entry.yColumn);
+  const groupCol  = ds.columns.find(c => c.name === entry.groupByColumn);
+
+  if (!xCol || !yCol || !groupCol) return { labels: [], series: [] };
+
+  // --- 1. Build index list (optionally time-filtered) ---
+  let idxs = xCol.values.map((_, i) => i);
+
+  if (xCol.role === 'date' || xCol.role === 'datetime') {
+    const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
+    const days = state.timeRange === 'CUSTOM' && state.customDateRange
+      ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
+      : (limits[state.timeRange] || Infinity);
+
+    if (days < Infinity) {
+      if (state.timeRange === 'CUSTOM' && state.customDateRange) {
+        const fromMs = new Date(state.customDateRange.from).getTime();
+        const toMs   = new Date(state.customDateRange.to).getTime() + 86399999;
+        idxs = idxs.filter(i => xCol.values[i] !== null && xCol.values[i] >= fromMs && xCol.values[i] <= toMs);
+      } else {
+        const maxDate = Math.max(...xCol.values.filter(v => v !== null));
+        const cutoff  = maxDate - (days * 86400000);
+        idxs = idxs.filter(i => xCol.values[i] !== null && xCol.values[i] >= cutoff);
+      }
+    }
+  } else if (xCol.role === 'categorical') {
+    // Filter by date column if one exists
+    const dateCol = ds.columns.find(c => c.role === 'date');
+    if (dateCol && dateCol.values.length > 0) {
+      const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
+      const days = state.timeRange === 'CUSTOM' && state.customDateRange
+        ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
+        : (limits[state.timeRange] || Infinity);
+      if (days < Infinity) {
+        if (state.timeRange === 'CUSTOM' && state.customDateRange) {
+          const fromMs = new Date(state.customDateRange.from).getTime();
+          const toMs   = new Date(state.customDateRange.to).getTime() + 86399999;
+          idxs = idxs.filter(i => dateCol.values[i] !== null && dateCol.values[i] >= fromMs && dateCol.values[i] <= toMs);
+        } else {
+          const maxDate = Math.max(...dateCol.values.filter(v => v !== null));
+          const cutoff  = maxDate - (days * 86400000);
+          idxs = idxs.filter(i => dateCol.values[i] !== null && dateCol.values[i] >= cutoff);
+        }
+      }
+    }
+  }
+
+  // --- 2. Build { groupKey → { xLabel → aggregatedValue } } map ---
+  // Preserve insertion order so series are in the order they first appear
+  const groupMap = new Map(); // groupKey → Map(xLabel → sum)
+  const xLabelSet = new Map(); // xLabel → original x-value (for ordering)
+
+  idxs.forEach(i => {
+    const xLabel   = xCol.labels ? xCol.labels[i] : String(xCol.values[i]);
+    const yVal     = typeof yCol.values[i] === 'number' ? yCol.values[i] : (parseFloat(yCol.values[i]) || 0);
+    const groupKey = String(groupCol.values[i] ?? '(Empty)');
+
+    if (!xLabelSet.has(xLabel)) xLabelSet.set(xLabel, xCol.values[i]);
+    if (!groupMap.has(groupKey)) groupMap.set(groupKey, new Map());
+    const inner = groupMap.get(groupKey);
+    inner.set(xLabel, (inner.get(xLabel) || 0) + yVal);
+  });
+
+  // --- 3. Sort x labels ---
+  // For datetime, they are already chronological. For date/categorical, sort by first occurrence.
+  let allLabels;
+  if (xCol.role === 'datetime') {
+    // Preserve order as they appear in the filtered index (already time-sorted)
+    allLabels = [];
+    const seen = new Set();
+    idxs.forEach(i => {
+      const l = xCol.labels[i];
+      if (!seen.has(l)) { seen.add(l); allLabels.push(l); }
+    });
+  } else {
+    allLabels = Array.from(xLabelSet.keys());
+  }
+
+  // --- 4. Point-limit: use the widest card estimate ---
+  const card = document.getElementById(entry.id);
+  const width = card ? card.offsetWidth : 600;
+  const pixelsPerPoint = (xCol.role === 'datetime') ? 30 : 60;
+  const limit = Math.max(6, Math.floor(width / pixelsPerPoint));
+  allLabels = allLabels.slice(0, limit);
+
+  // --- 5. Build series array ---
+  const series = Array.from(groupMap.entries()).map(([groupKey, innerMap]) => ({
+    name: groupKey,
+    data: allLabels.map(l => innerMap.get(l) ?? null),
+  }));
+
+  return { labels: allLabels, series };
+}
+
+/* ============================================================
    APEX CHARTS
 ============================================================ */
 function initApexChart(entry){
   const d=document.documentElement.getAttribute('data-theme')==='dark';
-  const{labels,values}=getChartData(entry);
   const ac='#00d4aa',ac2='#f59e0b',dng='#f85149',suc='#3fb950';
+  const PALETTE=[ac,'#0099ff','#7c3aed',ac2,suc,dng,'#ec4899','#14b8a6','#f97316','#8b5cf6'];
 
   // Smart value formatter: detect currency vs plain number vs large int
   const isRevEntry = entry.yColumn && /revenue|sales|amount|price|cost|profit|income/i.test(entry.yColumn);
@@ -1184,9 +1304,61 @@ function initApexChart(entry){
     chart:{type:entry.type==='donut'?'donut':entry.type,background:'transparent',foreColor:d?'#7d8590':'#6b7280',toolbar:{show:false},animations:{enabled:true,speed:500},fontFamily:"'Outfit',sans-serif",height:240},
     theme:{mode:d?'dark':'light'},
     grid:{borderColor:d?'#21282f':'#e5e7eb',strokeDashArray:3,padding:{left:10,right:10,top:0,bottom:0}},
-    stroke:{curve:'smooth',width:2},dataLabels:{enabled:false},legend:{show:false},
+    stroke:{curve:'smooth',width:2},dataLabels:{enabled:false},
     tooltip:{theme:d?'dark':'light',style:{fontFamily:"'Outfit',sans-serif",fontSize:'12px'},y:{formatter:fmt}},
   };
+
+  // ── COMBINED (multi-series) chart ────────────────────────────────────────────
+  if (entry.groupByColumn && entry.type !== 'donut') {
+    const { labels, series } = getCombinedChartData(entry);
+
+    const xCol = state.parsedDataset
+      ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
+      : null;
+    const isDatetime = xCol?.role === 'datetime';
+
+    let xFormatter = undefined;
+    if (isDatetime && labels.length > 0) {
+      const firstDate = labels[0]?.split(',')[0];
+      const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
+      xFormatter = allSameDay
+        ? (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/^[A-Za-z]+ \d+,\s*/, ''); }
+        : (val) => { if (!val || typeof val !== 'string') return val; return val.replace(/:\d{2}\s*(AM|PM)/i, ' $1'); };
+    }
+
+    const opts = {
+      ...base,
+      series,
+      colors: PALETTE,
+      legend: { show: true, position: 'top', fontSize: '12px', fontFamily: "'Outfit',sans-serif", labels: { colors: d ? '#7d8590' : '#6b7280' } },
+      xaxis: {
+        type: 'category',
+        categories: labels,
+        labels: {
+          style: { fontSize: '11px', fontFamily: "'Outfit',sans-serif" },
+          rotate: -35,
+          rotateAlways: isDatetime || labels.length > 12,
+          formatter: xFormatter,
+        },
+        axisBorder: { show: false },
+        axisTicks:  { show: false },
+      },
+      yaxis: { labels: { style: { fontSize: '11px', fontFamily: "'Outfit',sans-serif" }, formatter: fmt } },
+      fill: entry.type === 'area'
+        ? { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: .35, opacityTo: .01, stops: [0, 100] } }
+        : {},
+      plotOptions: entry.type === 'bar'
+        ? { bar: { borderRadius: 3, columnWidth: '60%', distributed: false } }
+        : {},
+    };
+
+    const el = document.getElementById('apex-' + entry.id); if (!el) return;
+    const apex = new ApexCharts(el, opts); apex.render(); entry.apexInstance = apex;
+    return;
+  }
+
+  // ── SINGLE-SERIES chart (original behaviour) ─────────────────────────────────
+  const{labels,values}=getChartData(entry);
 
   let opts;
   if(entry.type === 'donut') {
@@ -1196,6 +1368,7 @@ function initApexChart(entry){
       ...base,
       series: donutData.values,
       labels: donutData.labels,
+      legend:{show:false},
       colors: [ac, ac2, '#0099ff', '#7c3aed', suc, dng],
       plotOptions: {
         pie: {
@@ -1230,17 +1403,12 @@ function initApexChart(entry){
       const firstDate = labels[0]?.split(',')[0]; // e.g. "Mar 29"
       const allSameDay = labels.every(l => l.split(',')[0] === firstDate);
       if (allSameDay) {
-        // All on the same day → show only "5:00:37 PM" on the axis tick
         xFormatter = (val) => {
-          // Guard: ApexCharts may call the formatter with a numeric index or
-          // undefined for extra ticks; .replace() on a non-string throws TypeError.
           if (!val || typeof val !== 'string') return val;
-          // val is the full label like "Mar 29, 5:00:37 PM"
           const timePart = val.replace(/^[A-Za-z]+ \d+,\s*/, '');
           return timePart;
         };
       } else {
-        // Multiple days → show "Mar 29, 5:00 PM" (drop seconds on tick for brevity)
         xFormatter = (val) => {
           if (!val || typeof val !== 'string') return val;
           return val.replace(/:\d{2}\s*(AM|PM)/i, ' $1');
@@ -1249,12 +1417,8 @@ function initApexChart(entry){
     }
 
     opts={...base,series:[{name:entry.yColumn||entry.title,data:values}],
+      legend:{show:false},
       xaxis:{
-        // Explicitly pin the axis to 'category' mode so ApexCharts does NOT
-        // auto-detect 'datetime' from the label strings (e.g. "Mar 29, 5:00:37 PM").
-        // Without this, line/area charts silently switch to datetime mode, expect
-        // {x,y} pairs, and render completely empty because the series is plain numbers.
-        // Bar charts are unaffected (ApexCharts never auto-promotes a bar axis).
         type: 'category',
         categories: labels,
         labels: {
@@ -1278,6 +1442,16 @@ function initApexChart(entry){
 function updateAllCharts(){
   state.charts.forEach(entry=>{
     if(!entry.apexInstance)return;
+
+    // ── Combined multi-series ────────────────────────────────────────────────
+    if(entry.groupByColumn && entry.type !== 'donut'){
+      // Destroy & rebuild — ApexCharts can't reliably update a variable number of series in place
+      entry.apexInstance.destroy();
+      entry.apexInstance = null;
+      initApexChart(entry);
+      return;
+    }
+
     const{labels,values}=getChartData(entry);
     if(entry.type==='donut'){
       entry.apexInstance.updateSeries(values);
@@ -1361,7 +1535,12 @@ document.addEventListener('click', e => {
 function updateChartTitle(id, t) {
   const entry = state.charts.find(c => c.id === id); if (!entry) return;
   entry.title = t.trim() || entry.title;
-  if (entry.apexInstance && entry.type !== 'donut') {
+  if (!entry.apexInstance) return;
+
+  // Combined multi-series: series names come from group keys, not the title
+  if (entry.groupByColumn && entry.type !== 'donut') return;
+
+  if (entry.type !== 'donut') {
     const { labels, values } = getChartData(entry);
     const xCol = state.parsedDataset
       ? state.parsedDataset.columns.find(c => c.name === entry.xColumn)
@@ -1393,6 +1572,15 @@ function toggleCardSize(id) {
   setTimeout(() => {
     const entry = state.charts.find(c => c.id === id);
     if (!entry?.apexInstance) return;
+
+    // Combined multi-series: rebuild to recalculate point limit at new width
+    if (entry.groupByColumn && entry.type !== 'donut') {
+      entry.apexInstance.destroy();
+      entry.apexInstance = null;
+      initApexChart(entry);
+      return;
+    }
+
     const { labels, values } = getChartData(entry); // now re-slices at new width
     if (entry.type === 'donut') {
       entry.apexInstance.updateSeries(values);
@@ -1510,17 +1698,25 @@ async function generateSummary(id) {
       throw new Error('No backend URL configured or no dataset loaded.');
     }
 
-    const ds = state.parsedDataset;
-
-    // Use the FILTERED data for this time range, not the full-dataset derivedData
-    const { labels: filteredLabels, values: filteredValues } = getChartData(entry);
-    const yStats = computeFilteredStats(filteredValues);
+    // ── Combined chart: compute per-series stats ─────────────────────────────
+    let yStats, xSample, filteredLabels;
+    if (entry.groupByColumn && entry.type !== 'donut') {
+      const { labels, series } = getCombinedChartData(entry);
+      filteredLabels = labels;
+      // Build a merged flat values array across all series for overall stats
+      const allVals = series.flatMap(s => s.data.filter(v => v !== null));
+      yStats = computeFilteredStats(allVals);
+    } else {
+      const { labels: fl, values: filteredValues } = getChartData(entry);
+      filteredLabels = fl;
+      yStats = computeFilteredStats(filteredValues);
+    }
 
     if (!yStats) {
       throw new Error('No numeric data available for the selected time range.');
     }
 
-    const xSample = filteredLabels.filter((_, i) =>
+    xSample = filteredLabels.filter((_, i) =>
       i % Math.ceil(filteredLabels.length / 20) === 0
     ).slice(0, 20);
 
@@ -1676,18 +1872,37 @@ function autoGenerateChart(){
 /* ============================================================
    ADD CHART MODAL
 ============================================================ */
-function openModal(){document.getElementById('modal-overlay').classList.add('open')}
+function openModal(){
+  // Reset group-by selection and ensure Group By row is visible (re-select Line by default)
+  const gbSel = document.getElementById('modal-groupby');
+  if (gbSel) gbSel.value = '';
+  const gbWrap = document.getElementById('modal-groupby-wrap');
+  if (gbWrap) gbWrap.style.display = state.selectedChartType === 'donut' ? 'none' : '';
+  document.getElementById('modal-overlay').classList.add('open');
+}
 function closeModal(e){if(!e||e.target===document.getElementById('modal-overlay'))document.getElementById('modal-overlay').classList.remove('open')}
-function selectChartType(btn){document.querySelectorAll('.chart-type-btn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');state.selectedChartType=btn.getAttribute('data-type')}
+function selectChartType(btn){
+  document.querySelectorAll('.chart-type-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  state.selectedChartType=btn.getAttribute('data-type');
+  // Group By is not applicable for donut charts
+  const gbWrap=document.getElementById('modal-groupby-wrap');
+  if(gbWrap) gbWrap.style.display=state.selectedChartType==='donut'?'none':'';
+}
 function addChartFromModal(){
   const title=document.getElementById('modal-title').value.trim();
   const xCol=document.getElementById('modal-x-axis').value;
   const yCol=document.getElementById('modal-y-axis').value;
+  const groupByCol=document.getElementById('modal-groupby').value||null;
 
   if(state.parsedDataset){
-    addChart({title:title||`${yCol} by ${xCol}`,type:state.selectedChartType,xColumn:xCol,yColumn:yCol});
+    const autoTitle=groupByCol
+      ? `${yCol} by ${groupByCol} over ${xCol}`
+      : `${yCol} by ${xCol}`;
+    addChart({title:title||autoTitle,type:state.selectedChartType,xColumn:xCol,yColumn:yCol,groupByColumn:state.selectedChartType==='donut'?null:groupByCol});
     closeModal();
     document.getElementById('modal-title').value='';
+    document.getElementById('modal-groupby').value='';
     showToast('Chart added','success');
   } else {
     showToast('Upload a file to create custom charts.', 'error');
@@ -1936,7 +2151,9 @@ function saveSession(){
       const card = document.getElementById(id);
       return {
         id: c.id, title: c.title, type: c.type,
-        xColumn: c.xColumn, yColumn: c.yColumn, summaryText: c.summaryText,
+        xColumn: c.xColumn, yColumn: c.yColumn,
+        groupByColumn: c.groupByColumn || null,
+        summaryText: c.summaryText,
         fullWidth: card ? card.classList.contains('full-width') : false,
       };
     }).filter(Boolean),
@@ -1961,7 +2178,7 @@ function loadSession(session){
   state.nextId = 1;
 
   session.charts.forEach(cfg=>{
-    const entry=addChart({title:cfg.title,type:cfg.type,xColumn:cfg.xColumn,yColumn:cfg.yColumn});
+    const entry=addChart({title:cfg.title,type:cfg.type,xColumn:cfg.xColumn,yColumn:cfg.yColumn,groupByColumn:cfg.groupByColumn||null});
     if(cfg.fullWidth){
       requestAnimationFrame(()=>{
         const card=document.getElementById(entry.id);
@@ -2010,6 +2227,7 @@ function saveTemplate(){
         type:      entry.type,
         xColumn:   entry.xColumn,
         yColumn:   entry.yColumn,
+        groupByColumn: entry.groupByColumn || null,
         fullWidth: card ? card.classList.contains('full-width') : false,
       };
     }).filter(Boolean),
@@ -2062,6 +2280,7 @@ function applyTemplate(tpl){
       type:    cfg.type,
       xColumn: cfg.xColumn,
       yColumn: cfg.yColumn,
+      groupByColumn: cfg.groupByColumn || null,
     });
     if (cfg.fullWidth) {
       // Apply full-width after the card is in the DOM
@@ -2115,6 +2334,15 @@ const _deb=(fn,d)=>{let t;return(...a)=>{clearTimeout(t);t=setTimeout(()=>fn(...
 window.addEventListener('resize', _deb(() => {
   state.charts.forEach(c => {
     if (!c.apexInstance) return;
+
+    // Combined multi-series: destroy & rebuild to recalculate point limit
+    if (c.groupByColumn && c.type !== 'donut') {
+      c.apexInstance.destroy();
+      c.apexInstance = null;
+      initApexChart(c);
+      return;
+    }
+
     const { labels, values } = getChartData(c);
     if (c.type === 'donut') {
       c.apexInstance.updateSeries(values);
