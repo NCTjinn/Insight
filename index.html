@@ -1082,10 +1082,9 @@ function getChartData(entry) {
   let labels = xCol.labels;
   let values = yCol.values.map(v => typeof v === 'number' ? v : parseFloat(v) || 0);
 
-  const isTimeAxis = xCol.role === 'date' || xCol.role === 'datetime';
-
   // 1. Time range slicing
-  if (isTimeAxis && xCol.values.length > 0) {
+  if ((xCol.role === 'date' || xCol.role === 'datetime') && xCol.values.length > 0) {
+    // ── Date / Datetime x-axis: filter directly on xCol timestamps ───────────
     const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
     const days = state.timeRange === 'CUSTOM' && state.customDateRange
       ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
@@ -1095,11 +1094,12 @@ function getChartData(entry) {
       let idxs;
       if (state.timeRange === 'CUSTOM' && state.customDateRange) {
         const fromMs = new Date(state.customDateRange.from).getTime();
+        // Add 86399999 ms (23:59:59.999) so the end date is treated as end-of-day,
+        // not midnight — otherwise all same-day datetime rows would be excluded.
         const toMs   = new Date(state.customDateRange.to).getTime() + 86399999;
         idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= fromMs && v <= toMs).map(({ i }) => i);
       } else {
-        const validDates = xCol.values.filter(v => v !== null && !isNaN(v));
-        const maxDateInData = validDates.length > 0 ? Math.max(...validDates) : Date.now();
+        const maxDateInData = Math.max(...xCol.values.filter(v => v !== null));
         const cutoff = maxDateInData - (days * 86400000);
         idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= cutoff).map(({ i }) => i);
       }
@@ -1107,7 +1107,9 @@ function getChartData(entry) {
       values = idxs.map(i => yCol.values[i] || 0);
     }
   } else if (xCol.role === 'categorical') {
-    const dateCol = ds.columns.find(c => c.role === 'date' || c.role === 'datetime');
+    // ── Categorical x-axis (bar / donut): locate a date column and use it
+    //    to filter rows before aggregation, so the time range control works. ──
+    const dateCol = ds.columns.find(c => c.role === 'date');
     if (dateCol && dateCol.values.length > 0) {
       const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
       const days = state.timeRange === 'CUSTOM' && state.customDateRange
@@ -1121,8 +1123,7 @@ function getChartData(entry) {
           const toMs   = new Date(state.customDateRange.to).getTime() + 86399999;
           idxs = dateCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= fromMs && v <= toMs).map(({ i }) => i);
         } else {
-          const validDates = dateCol.values.filter(v => v !== null && !isNaN(v));
-          const maxDate = validDates.length > 0 ? Math.max(...validDates) : Date.now();
+          const maxDate = Math.max(...dateCol.values.filter(v => v !== null));
           const cutoff  = maxDate - (days * 86400000);
           idxs = dateCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= cutoff).map(({ i }) => i);
         }
@@ -1132,12 +1133,15 @@ function getChartData(entry) {
     }
   }
 
-  // 2. AGGREGATION & SLICING
+  // 2. AGGREGATION: Group values by label to prevent chart clutter.
+  //    For 'datetime' columns every label already encodes a unique timestamp, so
+  //    aggregation would falsely collapse points that happen to land on the same
+  //    second. Skip it and return the rows as-is.
   if (xCol.role === 'datetime') {
     const limit = getPointLimit(entry.id);
     return {
-      labels: labels.slice(-limit),
-      values: values.slice(-limit),
+      labels: labels.slice(0, limit),
+      values: values.slice(0, limit),
     };
   }
 
@@ -1151,10 +1155,9 @@ function getChartData(entry) {
   const finalValues = Array.from(aggMap.values());
 
   const limit = getPointLimit(entry.id);
-  
   return {
-    labels: finalLabels.slice(-limit),
-    values: finalValues.slice(-limit)
+    labels: finalLabels.slice(0, limit),
+    values: finalValues.slice(0, limit)
   };
 }
 
