@@ -132,14 +132,19 @@ function processRawRows(rows, fileName) {
 
   // --- 1. Extract headers ---
   const rawHeaders = rows[headerRowIdx].map(h => String(h ?? '').trim());
-  // Clean up testmy.net-style "Date format: ..." prefix in the first column header
-  const headers = rawHeaders
-    .map(h => h.replace(/^date format:\s*/i, 'Date').trim())
-    .filter(h => h !== '');
-  const colCount = headers.length;
+  const colMap = [];
 
+  rawHeaders.forEach((h, originalIdx) => {
+    const cleaned = h.replace(/^date format:\s*/i, 'Date ').trim();
+    if (cleaned !== '') {
+      colMap.push({ name: cleaned, index: originalIdx });
+    }
+  });
+
+  const colCount = colMap.length;
   if (colCount === 0) throw new Error('No column headers found in the first row.');
 
+  const headers = colMap.map(c => c.name);
   progress(`Found ${colCount} column(s): ${headers.join(', ')}`);
 
   // --- 2. Extract data rows (drop fully empty rows) ---
@@ -151,16 +156,16 @@ function processRawRows(rows, fileName) {
   progress(`${originalRowCount} data row(s) found.`);
 
   // --- 2.5 Sort by Date (if a date column exists) ---
-  const dateColIdx = headers.findIndex(h => {
-    const firstVal = dataRows[0][headers.indexOf(h)];
+  const dateColEntry = colMap.find(entry => {
+    const firstVal = dataRows[0][entry.index];
     return parseFlexibleDate(firstVal) !== null;
   });
 
-  if (dateColIdx !== -1) {
-    progress(`Sorting dataset by column: "${headers[dateColIdx]}"...`);
+  if (dateColEntry) {
+    progress(`Sorting dataset by column: "${dateColEntry.name}"...`);
     dataRows.sort((a, b) => {
-      const da = parseFlexibleDate(a[dateColIdx]);
-      const db = parseFlexibleDate(b[dateColIdx]);
+      const da = parseFlexibleDate(a[dateColEntry.index]);
+      const db = parseFlexibleDate(b[dateColEntry.index]);
       return (da?.getTime() || 0) - (db?.getTime() || 0);
     });
   }
@@ -169,15 +174,15 @@ function processRawRows(rows, fileName) {
   const DOWNSAMPLE_THRESHOLD = 1000;
   let downsampled = false;
   if (originalRowCount > DOWNSAMPLE_THRESHOLD) {
-  progress(`Downsampling ${originalRowCount} rows to ${DOWNSAMPLE_THRESHOLD} using LTTB for visual fidelity...`);
-  dataRows = downsampleLTTB(dataRows, DOWNSAMPLE_THRESHOLD);
-  downsampled = true;
+    progress(`Downsampling ${originalRowCount} rows to ${DOWNSAMPLE_THRESHOLD} using LTTB for visual fidelity...`);
+    dataRows = downsampleLTTB(dataRows, DOWNSAMPLE_THRESHOLD);
+    downsampled = true;
   }
 
   // --- 4. Build per-column raw value arrays ---
-  const rawCols = headers.map((name, i) => ({
-    name,
-    rawValues: dataRows.map(row => (row[i] !== undefined ? row[i] : '')),
+  const rawCols = colMap.map(entry => ({
+    name: entry.name,
+    rawValues: dataRows.map(row => (row[entry.index] !== undefined ? row[entry.index] : '')),
   }));
 
   // --- 5. Analyse each column ---
@@ -185,12 +190,11 @@ function processRawRows(rows, fileName) {
   const columns = rawCols.map(col => analyseColumn(col));
 
   columns.forEach(col => {
-    progress(`  Column "${col.name}" → role: ${col.role}${col.stats ? `, mean: ${col.stats.mean.toFixed(2)}, trend: ${col.stats.trend}` : ''}`);
+    progress(`  Column "${col.name}" → role: ${col.role}${col.stats ? `, mean: ${col.stats.mean.toFixed(2)}` : ''}`);
   });
 
   // --- 6. Generate chart suggestions ---
   const suggestions = suggestCharts(columns);
-  progress(`Generated ${suggestions.length} chart suggestion(s): ${suggestions.map(s => `"${s.title}" (${s.type})`).join(', ')}`);
 
   // --- 7. Build derived data summary (what would be sent to the backend/Gemini) ---
   const derivedData = buildDerivedData(columns);
@@ -312,22 +316,22 @@ function parseFlexibleDate(v) {
     } catch { /* ignore */ }
   }
 
-  const s = String(v).trim();
+  let s = String(v).trim();
   if (!s) return null;
 
-  // testmy.net format: "Sun Mar 29 2026 @ 3:47:37 pm"
-  // The "@" separator breaks the standard Date parser — strip it first.
-  const testmyMatch = s.match(/^(\w+\s+\w+\s+\d+\s+\d{4})\s*@\s*(\d+:\d+:\d+\s*[ap]m)$/i);
-  if (testmyMatch) {
-    const d = new Date(`${testmyMatch[1]} ${testmyMatch[2]}`);
-    if (!isNaN(d.getTime()) && d.getFullYear() > 1900 && d.getFullYear() < 2100) return d;
-  }
+  // Remove day-of-week prefixes (e.g., "Sun ", "Monday, ") which confuse standard parsers.
+  s = s.replace(/^(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]*,?\s+/i, '');
+
+  // Replace the "@" separator with a space to create a standard date-time string.
+  s = s.replace(/\s*@\s*/, ' ');
 
   // Common date string patterns
   const d = new Date(s);
-  if (!isNaN(d.getTime()) && d.getFullYear() > 1900 && d.getFullYear() < 2100) return d;
+  if (!isNaN(d.getTime()) && d.getFullYear() > 1900 && d.getFullYear() < 2100) {
+    return d;
+  }
 
-  // Try dd/mm/yyyy
+  // Specific Fallback: dd/mm/yyyy or dd-mm-yyyy
   const dmy = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
   if (dmy) {
     const [, dd, mm, yyyy] = dmy;
