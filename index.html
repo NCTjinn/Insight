@@ -2404,10 +2404,37 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
   const titleEl = card.querySelector('.card-title');
   const titleText = (titleEl?.textContent || entry?.title || '').trim();
 
-  // Chart image via ApexCharts' own renderer
+  // Stats card values (for type === 'stats' cards which have no apexInstance)
+  const isStats = entry?.type === 'stats';
+  const statsData = isStats ? {
+    metric:   card.querySelector('[id^="stats-metric-"]')?.textContent?.trim() || '',
+    value:    card.querySelector('[id^="stats-value-"]')?.textContent?.trim()  || '—',
+    colLabel: card.querySelector('[id^="stats-col-label-"]')?.textContent?.trim() || '',
+    filter:   card.querySelector('[id^="stats-filter-pill-"] .stats-filter-pill')?.textContent?.trim() || '',
+    count:    card.querySelector('[id^="stats-count-"]')?.textContent?.trim()  || '',
+  } : null;
+
+  // Chart image via ApexCharts' own renderer.
+  // Temporarily switch to a light-mode / dark-foreground theme so axis labels,
+  // grid lines and legend text render as visible dark colours in the export PNG.
   let chartImg = null;
   let chartNaturalH = 0;
   if (entry?.apexInstance) {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    // Switch to export-friendly colours (dark text on white)
+    if (isDark) {
+      try {
+        await entry.apexInstance.updateOptions({
+          theme: { mode: 'light' },
+          chart: { foreColor: '#111827', background: '#ffffff' },
+          grid:  { borderColor: '#e5e7eb' },
+          legend: { labels: { colors: '#111827' } },
+        }, false, false);
+        // One rAF so the SVG re-paints before we snapshot
+        await new Promise(r => requestAnimationFrame(r));
+      } catch (_) {}
+    }
+
     try {
       const { imgURI } = await entry.apexInstance.dataURI();
       if (imgURI && imgURI !== 'data:,') {
@@ -2420,6 +2447,18 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
         chartNaturalH = chartImg.naturalHeight / (chartImg.naturalWidth / (cardW - PAD * 2)) || 0;
       }
     } catch (_) {}
+
+    // Restore original theme
+    if (isDark) {
+      try {
+        entry.apexInstance.updateOptions({
+          theme: { mode: 'dark' },
+          chart: { foreColor: '#7d8590', background: 'transparent' },
+          grid:  { borderColor: '#21282f' },
+          legend: { labels: { colors: '#7d8590' } },
+        }, false, false);
+      } catch (_) {}
+    }
   }
 
   // AI summary text (only if visible)
@@ -2459,7 +2498,13 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
     ? (24 + measureWrappedText(octx, summaryText, BODY_SIZE, drawW - PAD * 2) + PAD)
     : 0;
 
-  const totalH = PAD + titleH + chartH + (summaryText ? PAD / 2 : 0) + summaryH + PAD;
+  // Stats card body height: metric pill + big value + col label + optional filter + count
+  const STATS_VALUE_SIZE = 48;
+  const statsBodyH = isStats
+    ? (PAD + 22 + 12 + STATS_VALUE_SIZE + 12 + 18 + (statsData.filter ? 28 : 0) + 18 + PAD)
+    : 0;
+
+  const totalH = PAD + titleH + chartH + statsBodyH + (summaryText ? PAD / 2 : 0) + summaryH + PAD;
 
   // ── 3. Draw onto the real canvas ─────────────────────────────────────────
   const canvas = document.createElement('canvas');
@@ -2489,6 +2534,72 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
   if (chartImg) {
     ctx.drawImage(chartImg, PAD, y, drawW, chartNaturalH);
     y += chartH;
+  }
+
+  // Stats card body
+  if (isStats && statsData) {
+    const cx = cardW / 2;  // centre x for centred text
+
+    // Metric pill
+    const pillText = statsData.metric.toUpperCase();
+    ctx.font = `700 11px 'Outfit', sans-serif`;
+    const pillW = ctx.measureText(pillText).width + 24;
+    const pillH = 22;
+    const pillX = cx - pillW / 2;
+    ctx.fillStyle = '#f0f4f8';
+    roundRect(ctx, pillX, y, pillW, pillH, 11);
+    ctx.fill();
+    ctx.strokeStyle = BORDER;
+    ctx.lineWidth = 1;
+    roundRect(ctx, pillX, y, pillW, pillH, 11);
+    ctx.stroke();
+    ctx.fillStyle = MUTED;
+    ctx.textAlign = 'center';
+    ctx.fillText(pillText, cx, y + 15);
+    y += pillH + 12;
+
+    // Big value
+    ctx.fillStyle = '#008f72';
+    ctx.font = `800 ${STATS_VALUE_SIZE}px 'Outfit', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(statsData.value, cx, y + STATS_VALUE_SIZE);
+    y += STATS_VALUE_SIZE + 12;
+
+    // Column label
+    ctx.fillStyle = MUTED;
+    ctx.font = `500 13px 'Outfit', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(statsData.colLabel, cx, y + 13);
+    y += 13 + (statsData.filter ? 10 : 0);
+
+    // Filter pill (optional)
+    if (statsData.filter) {
+      const fpText = statsData.filter.replace(/\s+/g, ' ').trim();
+      ctx.font = `500 11px 'Outfit', sans-serif`;
+      const fpW = ctx.measureText(fpText).width + 24;
+      const fpH = 22;
+      const fpX = cx - fpW / 2;
+      ctx.fillStyle = 'rgba(245,158,11,0.1)';
+      roundRect(ctx, fpX, y, fpW, fpH, 11);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(245,158,11,0.3)';
+      ctx.lineWidth = 1;
+      roundRect(ctx, fpX, y, fpW, fpH, 11);
+      ctx.stroke();
+      ctx.fillStyle = '#c47b00';
+      ctx.textAlign = 'center';
+      ctx.fillText(fpText, cx, y + 15);
+      y += fpH + 10;
+    }
+
+    // Row count
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = `400 11px 'Outfit', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(statsData.count, cx, y + 11);
+    y += 11 + PAD;
+
+    ctx.textAlign = 'left'; // reset
   }
 
   // AI summary box
