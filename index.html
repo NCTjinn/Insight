@@ -1691,6 +1691,26 @@ function initApexChart(entry){
       plotOptions: entry.type === 'bar'
         ? { bar: { borderRadius: 3, columnWidth: '60%', distributed: false } }
         : {},
+      // Prevent ghost markers: disable dynamic animation and suppress hover/active
+      // colour filters which cause SVG elements to linger after mouse-out.
+      // Extra left grid padding stops the clip-path from cutting off the first
+      // 1–2 marker circles that sit right at the chart edge.
+      chart: {
+        ...base.chart,
+        animations: { enabled: true, speed: 500, dynamicAnimation: { enabled: false } },
+      },
+      grid: {
+        ...base.grid,
+        padding: { left: 16, right: 10, top: 0, bottom: 0 },
+      },
+      markers: {
+        size: 0,
+        hover: { size: 5, sizeOffset: 0 },
+      },
+      states: {
+        hover:  { filter: { type: 'none' } },
+        active: { filter: { type: 'none' } },
+      },
     };
 
     const el = document.getElementById('apex-' + entry.id); if (!el) return;
@@ -2421,16 +2441,25 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
   let chartNaturalH = 0;
   if (entry?.apexInstance) {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    // Switch to export-friendly colours (dark text on white)
+    // Switch to export-friendly colours (dark text, transparent bg)
     if (isDark) {
       try {
         await entry.apexInstance.updateOptions({
           theme: { mode: 'light' },
-          chart: { foreColor: '#111827', background: '#ffffff' },
+          chart: { foreColor: '#111827', background: 'transparent' },
           grid:  { borderColor: '#e5e7eb' },
           legend: { labels: { colors: '#111827' } },
+          markers: { colors: Array(30).fill('#111827'), strokeColors: '#111827' },
         }, false, false);
         // One rAF so the SVG re-paints before we snapshot
+        await new Promise(r => requestAnimationFrame(r));
+      } catch (_) {}
+    } else {
+      // Light mode: just force markers dark; background already transparent
+      try {
+        await entry.apexInstance.updateOptions({
+          markers: { colors: Array(30).fill('#111827'), strokeColors: '#111827' },
+        }, false, false);
         await new Promise(r => requestAnimationFrame(r));
       } catch (_) {}
     }
@@ -2456,7 +2485,12 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
           chart: { foreColor: '#7d8590', background: 'transparent' },
           grid:  { borderColor: '#21282f' },
           legend: { labels: { colors: '#7d8590' } },
+          markers: {},
         }, false, false);
+      } catch (_) {}
+    } else {
+      try {
+        entry.apexInstance.updateOptions({ markers: {} }, false, false);
       } catch (_) {}
     }
   }
@@ -2498,10 +2532,10 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
     ? (24 + measureWrappedText(octx, summaryText, BODY_SIZE, drawW - PAD * 2) + PAD)
     : 0;
 
-  // Stats card body height: metric pill + big value + col label + optional filter + count
+  // Stats card body height: metric pill + big value + col label + optional filter
   const STATS_VALUE_SIZE = 48;
   const statsBodyH = isStats
-    ? (PAD + 22 + 12 + STATS_VALUE_SIZE + 12 + 18 + (statsData.filter ? 28 : 0) + 18 + PAD)
+    ? (PAD + 22 + 12 + STATS_VALUE_SIZE + 12 + 18 + (statsData.filter ? 28 : 0) + PAD)
     : 0;
 
   const totalH = PAD + titleH + chartH + statsBodyH + (summaryText ? PAD / 2 : 0) + summaryH + PAD;
@@ -2592,13 +2626,7 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
       y += fpH + 10;
     }
 
-    // Row count
-    ctx.fillStyle = '#9ca3af';
-    ctx.font = `400 11px 'Outfit', sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.fillText(statsData.count, cx, y + 11);
-    y += 11 + PAD;
-
+    y += PAD;
     ctx.textAlign = 'left'; // reset
   }
 
