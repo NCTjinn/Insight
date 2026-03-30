@@ -717,6 +717,82 @@ const state={
 };
 
 /* ============================================================
+   TEMPLATE AUTO-DETECTION RULES
+   ─────────────────────────────────────────────────────────────
+   Each rule maps a set of required column names → a template
+   file path. Rules are evaluated in order; the first full match
+   wins. Column matching is case-insensitive.
+
+   To add a new rule, append an object to the array:
+   {
+     columns:  ['ColA', 'ColB'],       // ALL must exist in the dataset
+     template: '/templates/my.json',   // path served by your web server
+     name:     'My Template',          // label shown in toast messages
+   }
+============================================================ */
+const TEMPLATE_RULES = [
+  {
+    columns:  ['Type', 'Mbps'],
+    template: '/templates/testmynet.json',
+    name:     'TestMyNet',
+  },
+  // ── Add more rules below ───────────────────────────────────
+  // {
+  //   columns:  ['Date', 'Revenue', 'Region'],
+  //   template: '/templates/sales.json',
+  //   name:     'Sales Dashboard',
+  // },
+];
+
+/**
+ * Check whether a dataset's column names satisfy a rule's required list.
+ * Comparison is case-insensitive so "type" and "TYPE" both match "Type".
+ */
+function datasetMatchesRule(dataset, rule) {
+  const datasetCols = new Set(
+    dataset.columns.map(c => c.name.toLowerCase())
+  );
+  return rule.columns.every(required => datasetCols.has(required.toLowerCase()));
+}
+
+/**
+ * After a file is parsed, scan TEMPLATE_RULES for a matching rule.
+ * If found, fetch its template JSON and apply it; otherwise fall
+ * back to the normal suggestion-based initDashboard().
+ *
+ * Returns a Promise that resolves when the dashboard is ready.
+ */
+async function detectAndApplyTemplate(dataset) {
+  for (const rule of TEMPLATE_RULES) {
+    if (!datasetMatchesRule(dataset, rule)) continue;
+
+    // ── Match found ───────────────────────────────────────────
+    showToast(`Detected "${rule.name}" layout — loading template…`, 'success');
+
+    try {
+      const res = await fetch(rule.template);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const tpl = await res.json();
+
+      state.charts  = [];
+      state.nextId  = 1;
+      document.getElementById('chart-grid').innerHTML = '';
+
+      applyTemplate(tpl);
+      console.log(`[Insight] Auto-applied template "${rule.name}" from ${rule.template}`);
+    } catch (err) {
+      console.error(`[Insight] Failed to load template "${rule.name}":`, err);
+      showToast(`Template load failed (${err.message}) — using auto charts`, 'error');
+      initDashboard();  // graceful fallback
+    }
+    return;
+  }
+
+  // ── No rule matched — default behaviour ───────────────────
+  initDashboard();
+}
+
+/* ============================================================
    WORKER ORCHESTRATION
    Spins up parser.worker.js, forwards progress to the overlay,
    and calls onParseComplete() when done.
@@ -779,9 +855,11 @@ function onParseComplete(dataset){
   // Populate modal axis dropdowns with real column names
   populateAxisDropdowns(dataset.columns);
 
-  initDashboard();
   showPage('dashboard');
   showToast(`"${dataset.fileName}" loaded — ${dataset.rowCount} rows, ${dataset.columns.length} columns${dataset.downsampled?' (downsampled)':''}`, 'success');
+
+  // Auto-detect a matching template and apply it; falls back to initDashboard()
+  detectAndApplyTemplate(dataset);
 }
 
 /* ============================================================
