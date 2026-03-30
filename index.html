@@ -184,10 +184,15 @@
     .date-picker-actions{display:flex;gap:8px;justify-content:flex-end}
 
     /* Chart grid */
-    .chart-grid{padding:0 32px 32px;display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+    .chart-grid {
+      padding: 0 32px 32px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+    }
 
     /* Cards — overflow visible so ApexCharts tooltips + annotation labels + dropdowns render outside the card boundary */
-    .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:visible;transition:border-color var(--trans),box-shadow var(--trans);position:relative;animation:fadeUp .4s ease forwards;opacity:0}
+    .chart-card{grid-column: span 2;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:visible;transition:border-color var(--trans),box-shadow var(--trans);position:relative;animation:fadeUp .4s ease forwards;opacity:0}
     .chart-card:nth-child(1){animation-delay:.05s}
     .chart-card:nth-child(2){animation-delay:.10s}
     .chart-card:nth-child(3){animation-delay:.15s}
@@ -197,6 +202,7 @@
     .chart-card.full-width{grid-column:1/-1}
     .chart-card.dragging{opacity:.5;border:2px dashed var(--accent)}
     .chart-card.drag-target{border:2px dashed var(--accent2)}
+    .chart-card.stats-card-variant {grid-column: span 1;}
 
     /* --- Export Refinements --- */
     .chart-card.is-capturing {
@@ -428,6 +434,8 @@
     ::-webkit-scrollbar-thumb{background:var(--border-lit);border-radius:3px}
 
     /* Responsive */
+    @media(max-width:1200px){.chart-grid{grid-template-columns: repeat(2, 1fr);}.chart-card.stats-card-variant{grid-column: span 1;}}
+    @media(max-width:900px){.chart-grid{grid-template-columns: 1fr;}.chart-card,.chart-card.stats-card-variant{grid-column: span 1;}}
     @media(max-width:900px){.chart-grid{grid-template-columns:1fr;padding:0 16px 24px}.topbar,.dash-toolbar{padding:0 16px}.dash-toolbar{padding:12px 16px}.upload-header,.upload-footer{padding:16px 24px}}
     @media(max-width:600px){.upload-card{padding:24px}.topbar-right .btn span{display:none}.date-picker-popover{min-width:260px}}
   </style>
@@ -1166,8 +1174,12 @@ function removeChart(id){
 }
 function buildCardDOM(entry){
   const card=document.createElement('div');
-  card.className='chart-card';card.id=entry.id;
-  card.setAttribute('draggable','true');card.setAttribute('data-id',entry.id);
+  const isStats = entry.type === 'stats';
+  card.className = `chart-card ${isStats ? 'stats-card-variant' : ''}`;
+  
+  card.id=entry.id;
+  card.setAttribute('draggable','true');
+  card.setAttribute('data-id',entry.id);
 
   // Hint text below title
   let titleHint = 'Click title to edit';
@@ -1186,7 +1198,7 @@ function buildCardDOM(entry){
     titleHint = `Filtered: ${entry.filterColumn} ${entry.filterOperator} "${entry.filterValue}"`;
   }
 
-  const bodyContent = entry.type === 'stats'
+  const bodyContent = isStats
     ? `<div class="stats-card-body" id="stats-${entry.id}">
         <div class="stats-metric-label" id="stats-metric-${entry.id}">—</div>
         <div class="stats-value" id="stats-value-${entry.id}">—</div>
@@ -1195,6 +1207,20 @@ function buildCardDOM(entry){
         <div class="stats-count" id="stats-count-${entry.id}"></div>
       </div>`
     : `<div class="card-chart" id="apex-${entry.id}"></div>`;
+  
+  const aiSection = isStats ? '' : `
+    <div class="card-ai-section">
+      <button class="ai-generate-btn" id="ai-btn-${entry.id}" onclick="generateSummary('${entry.id}')">
+        <span class="ai-icon">✦</span>Generate AI summary
+      </button>
+      <div class="ai-skeleton" id="ai-skeleton-${entry.id}">
+        <div class="skeleton-line" style="width:85%"></div>
+        <div class="skeleton-line" style="width:93%"></div>
+        <div class="skeleton-line"></div>
+      </div>
+      <div class="ai-summary-box" id="ai-summary-${entry.id}"></div>
+      <div class="ai-error-box" id="ai-error-${entry.id}">⚠️ Failed to generate summary. Please try again — your dashboard is unaffected.</div>
+    </div>`;
 
   card.innerHTML=`
     <input type="checkbox" class="card-checkbox" id="chk-${entry.id}" onchange="toggleCardSelection('${entry.id}')" />
@@ -1243,18 +1269,7 @@ function buildCardDOM(entry){
         </div>
       </div>
       ${bodyContent}
-      <div class="card-ai-section">
-        <button class="ai-generate-btn" id="ai-btn-${entry.id}" onclick="generateSummary('${entry.id}')">
-          <span class="ai-icon">✦</span>Generate AI summary
-        </button>
-        <div class="ai-skeleton" id="ai-skeleton-${entry.id}">
-          <div class="skeleton-line" style="width:85%"></div>
-          <div class="skeleton-line" style="width:93%"></div>
-          <div class="skeleton-line"></div>
-        </div>
-        <div class="ai-summary-box" id="ai-summary-${entry.id}"></div>
-        <div class="ai-error-box" id="ai-error-${entry.id}">⚠️ Failed to generate summary. Please try again — your dashboard is unaffected.</div>
-      </div>
+      ${aiSection}
     </div>`;
   return card;
 }
