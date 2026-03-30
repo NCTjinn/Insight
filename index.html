@@ -2393,11 +2393,21 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
       },
       grid:  { borderColor: '#e5e7eb' },
       legend: { labels: { colors: '#6b7280' } },
-    }, false /* no redraw */, false /* no animate */);
+    }, true /* redraw – forces a full synchronous re-render into the new theme */,
+       false /* no animate */);
   }
 
-  // Wait for paint to settle (ApexCharts redraws synchronously but SVG paint is async)
-  await new Promise(r => setTimeout(r, 450));
+  // Wait for the browser to commit at least two paint frames after ApexCharts'
+  // DOM mutations, then add a short buffer.  A flat setTimeout can fire before
+  // the compositor has finished painting the updated SVG, producing a blank/
+  // transparent capture.  The rAF chain guarantees we're past the next frame.
+  await new Promise(r =>
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        setTimeout(r, 150)
+      )
+    )
+  );
 
   // ── 2. Snapshot ─────────────────────────────────────────────────────────
   const captureOpts = {
