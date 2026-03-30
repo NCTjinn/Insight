@@ -205,20 +205,25 @@
     .chart-card.stats-card-variant {grid-column: span 1;}
 
     /* --- Export Refinements --- */
+
+    /* Outer card shell: transparent so PNG exports have proper alpha channel.
+       Transition/animation/hover/shadow all suppressed to avoid motion artefacts. */
     .chart-card.is-capturing {
-      border-radius: 0 !important;
-      overflow: hidden !important;   /* clips card-inner radius + prevents bg bleed */
+      overflow: hidden !important;
       box-shadow: none !important;
-      border: none !important;       /* remove border entirely so no edge artifact */
-      background: #ffffff !important; /* explicit white — prevents page bg bleed in any theme */
+      border: none !important;
+      background: transparent !important;
       transition: none !important;
+      animation: none !important;
+      pointer-events: none !important;   /* block any in-flight hover re-paint */
     }
 
-    /* Also flatten the inner wrapper's radius so no ghost corners appear */
+    /* Inner visual wrapper: light-mode surface, no radius so no ghost corners */
     .chart-card.is-capturing .card-inner {
       border-radius: 0 !important;
       overflow: hidden !important;
       background: #ffffff !important;
+      color: #111827 !important;
     }
 
     /* Remove empty box before summary is generated */
@@ -227,7 +232,7 @@
       display: none !important;
     }
 
-    /* Hide interactive UI elements during capture (consolidated, no duplicates) */
+    /* Hide interactive UI elements during capture */
     .chart-card.is-capturing .card-checkbox,
     .chart-card.is-capturing .card-actions,
     .chart-card.is-capturing .ai-generate-btn,
@@ -239,19 +244,10 @@
       display: none !important;
     }
 
-    /* Force the background and text colors to the light-mode values during capture */
-    .chart-card.is-capturing {
+    /* Force all text to light-mode values */
+    .chart-card.is-capturing .card-header {
       background: #ffffff !important;
       color: #111827 !important;
-      border-color: #e5e7eb !important;
-    }
-
-    .chart-card.is-capturing .card-inner,
-    .chart-card.is-capturing .card-header,
-    .chart-card.is-capturing .ai-summary-box {
-      background: #ffffff !important;
-      color: #111827 !important;
-      border: 1px solid #000000 !important;
     }
 
     .chart-card.is-capturing .card-title,
@@ -259,18 +255,21 @@
       color: #111827 !important;
     }
 
-    /* Fix: strong tags inherit the dark --text variable — force dark in light export */
     .chart-card.is-capturing .ai-summary-text strong {
       color: #111827 !important;
     }
 
-    /* Fix: list items inside summary use inline color:var(--text-muted) — override */
     .chart-card.is-capturing .ai-summary-box ul,
     .chart-card.is-capturing .ai-summary-box li {
       color: #374151 !important;
     }
 
-    /* Fix: ai-label dot and range pill still reference dark-mode accent */
+    .chart-card.is-capturing .ai-summary-box {
+      background: #f6f8fa !important;
+      border: 1px solid #e5e7eb !important;
+      color: #374151 !important;
+    }
+
     .chart-card.is-capturing .ai-label {
       color: #008f72 !important;
     }
@@ -2361,163 +2360,187 @@ function updateSelectionBar(){document.getElementById('selection-count').textCon
 /* ============================================================
    EXPORT
 ============================================================ */
-async function exportCardPDF(id) {
-  const card = document.getElementById(id);
-  const entry = state.charts.find(c => c.id === id);
-  if (!card || !entry) return;
+/* ============================================================
+   EXPORT — shared helpers
+============================================================ */
 
+/**
+ * Freeze a single card into light-mode capture state.
+ * Returns the dataUrl and a cleanup function.
+ *
+ * Options:
+ *   transparent {boolean} – omit bgcolor for PNG alpha (image export)
+ *   scale       {number}  – device-pixel ratio multiplier
+ */
+async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 } = {}) {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+  // ── 1. Block hover / animation re-paints ────────────────────────────────
   card.classList.add('is-capturing');
-  if (entry.apexInstance) {
+
+  if (entry?.apexInstance) {
     await entry.apexInstance.updateOptions({
       theme: { mode: 'light' },
-      chart: { animations: { enabled: false }, foreColor: '#6b7280' }
+      chart: {
+        animations: { enabled: false, dynamicAnimation: { enabled: false } },
+        foreColor: '#6b7280',
+        background: 'transparent',
+      },
+      tooltip:  { enabled: false },          // no hover tooltip artefact
+      states: {
+        hover:  { filter: { type: 'none' } }, // suppress bar/point hover highlight
+        active: { filter: { type: 'none' } },
+      },
+      grid:  { borderColor: '#e5e7eb' },
+      legend: { labels: { colors: '#6b7280' } },
+    }, false /* no redraw */, false /* no animate */);
+  }
+
+  // Wait for paint to settle (ApexCharts redraws synchronously but SVG paint is async)
+  await new Promise(r => setTimeout(r, 450));
+
+  // ── 2. Snapshot ─────────────────────────────────────────────────────────
+  const captureOpts = {
+    scale,
+    width:  card.offsetWidth,
+    height: card.offsetHeight,
+  };
+  if (!transparent) captureOpts.bgcolor = '#ffffff';
+
+  const dataUrl = await domtoimage.toPng(card, captureOpts);
+
+  // ── 3. Cleanup ───────────────────────────────────────────────────────────
+  card.classList.remove('is-capturing');
+
+  if (entry?.apexInstance) {
+    entry.apexInstance.updateOptions({
+      theme: { mode: isDark ? 'dark' : 'light' },
+      chart: {
+        animations: { enabled: true, dynamicAnimation: { enabled: true } },
+        foreColor: isDark ? '#7d8590' : '#6b7280',
+        background: 'transparent',
+      },
+      tooltip:  { enabled: true },
+      states: {
+        hover:  { filter: { type: 'lighten', value: 0.05 } },
+        active: { filter: { type: 'darken',  value: 0.05 } },
+      },
+      grid:  { borderColor: isDark ? '#21282f' : '#e5e7eb' },
+      legend: { labels: { colors: isDark ? '#7d8590' : '#6b7280' } },
     }, false, false);
   }
 
-  await new Promise(r => setTimeout(r, 400));
+  return dataUrl;
+}
+
+/**
+ * Add a card image to an existing jsPDF instance.
+ * Scales proportionally to fill the usable area (margin on all sides)
+ * without ever overflowing the page height.
+ */
+function _addCardToPdf(pdf, dataUrl, cardW, cardH) {
+  const A4_W   = pdf.internal.pageSize.getWidth();   // 210 mm
+  const A4_H   = pdf.internal.pageSize.getHeight();  // 297 mm
+  const MARGIN = 14; // mm on each side
+
+  const availW = A4_W - MARGIN * 2;
+  const availH = A4_H - MARGIN * 2;
+
+  // Scale to fill available width; shrink further if height overflows
+  let imgW = availW;
+  let imgH = (cardH / cardW) * imgW;
+
+  if (imgH > availH) {
+    imgH = availH;
+    imgW = (cardW / cardH) * imgH;
+  }
+
+  // Centre horizontally; pin to top margin vertically
+  const x = MARGIN + (availW - imgW) / 2;
+  const y = MARGIN;
+
+  pdf.setFillColor(255, 255, 255);
+  pdf.rect(0, 0, A4_W, A4_H, 'F');
+  pdf.addImage(dataUrl, 'PNG', x, y, imgW, imgH);
+}
+
+/* ── Individual card → PDF ──────────────────────────────────────────────── */
+async function exportCardPDF(id) {
+  const card  = document.getElementById(id);
+  const entry = state.charts.find(c => c.id === id);
+  if (!card || !entry) return;
 
   try {
-    const dataUrl = await domtoimage.toPng(card, {
-      scale: 2,
-      bgcolor: '#ffffff'
-    });
+    const dataUrl = await _freezeAndCapture(card, entry, { transparent: false, scale: 2 });
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pdfW = pdf.internal.pageSize.getWidth();
-    const margin = 12;
-    const imgW = pdfW - margin * 2;
-    const imgH = (card.offsetHeight * imgW) / card.offsetWidth;
-
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, pdfW, pdf.internal.pageSize.getHeight(), 'F');
-    pdf.addImage(dataUrl, 'PNG', margin, margin, imgW, imgH);
+    _addCardToPdf(pdf, dataUrl, card.offsetWidth, card.offsetHeight);
     pdf.save(`Insight-${id}.pdf`);
-  } finally {
-    card.classList.remove('is-capturing');
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (entry.apexInstance) {
-      entry.apexInstance.updateOptions({
-        theme: { mode: isDark ? 'dark' : 'light' },
-        chart: { animations: { enabled: true } }
-      }, false, false);
-    }
+  } catch (err) {
+    console.error('exportCardPDF:', err);
+    showToast('Export failed', 'error');
   }
 }
 
+/* ── Individual card → PNG (transparent background) ────────────────────── */
 async function exportCardImage(id) {
-  const card = document.getElementById(id);
+  const card  = document.getElementById(id);
   const entry = state.charts.find(c => c.id === id);
   if (!card || !entry) return;
-  
-  showToast('Preparing light-mode image...', 'success');
 
-  // 1. Enter capture mode & Force Light Mode for ApexCharts
-  card.classList.add('is-capturing');
-  if (entry.apexInstance) {
-    await entry.apexInstance.updateOptions({
-      theme: { mode: 'light' },
-      chart: { animations: { enabled: false }, foreColor: '#6b7280' },
-      grid: { borderColor: '#e5e7eb' }
-    }, false, false);
-  }
-
-  await new Promise(r => setTimeout(r, 400));
+  showToast('Preparing export…', 'success');
 
   try {
-    const dataUrl = await domtoimage.toPng(card, {
-      scale: 3,
-      bgcolor: '#ffffff'
-    });
+    // transparent: true → PNG carries an alpha channel; card bg is see-through
+    const dataUrl = await _freezeAndCapture(card, entry, { transparent: true, scale: 3 });
 
     const a = document.createElement('a');
     a.download = `Insight-${id}.png`;
     a.href = dataUrl;
     a.click();
-  } finally {
-    // 2. Revert to original theme
-    card.classList.remove('is-capturing');
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (entry.apexInstance) {
-      entry.apexInstance.updateOptions({
-        theme: { mode: isDark ? 'dark' : 'light' },
-        chart: { animations: { enabled: true }, foreColor: isDark ? '#7d8590' : '#6b7280' },
-        grid: { borderColor: isDark ? '#21282f' : '#e5e7eb' }
-      }, false, false);
-    }
+  } catch (err) {
+    console.error('exportCardImage:', err);
+    showToast('Export failed', 'error');
   }
 }
 
+/* ── Selected cards (batch) ─────────────────────────────────────────────── */
 async function exportSelected(fmt) {
   if (state.selectedCards.size === 0) return;
-  
-  const selectedIds = Array.from(state.selectedCards);
-  showToast(`Exporting ${selectedIds.length} charts...`, 'success');
 
-  // Process sequentially to prevent "blank page" memory issues
+  const selectedIds = Array.from(state.selectedCards);
+  showToast(`Exporting ${selectedIds.length} chart${selectedIds.length > 1 ? 's' : ''}…`, 'success');
+
   for (const id of selectedIds) {
-    if (fmt === 'pdf') {
-      await exportCardPDF(id); 
-    } else {
-      await exportCardImage(id);
-    }
-    // Small gap to prevent browser download blocking
-    await new Promise(r => setTimeout(r, 500));
+    if (fmt === 'pdf') await exportCardPDF(id);
+    else               await exportCardImage(id);
+    await new Promise(r => setTimeout(r, 500)); // prevent download queuing
   }
 
   clearSelection();
 }
 
+/* ── All cards → single multi-page PDF ─────────────────────────────────── */
 async function exportAllPDF() {
   const cards = document.querySelectorAll('.chart-card');
   if (cards.length === 0) return;
 
-  showToast('Generating multi-page report...', 'success');
+  showToast('Generating report…', 'success');
 
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p', 'mm', 'a4');
-  const pdfW = pdf.internal.pageSize.getWidth();
-  const margin = 12; // mm padding on each side
-  const imgW = pdfW - margin * 2;
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
   for (let i = 0; i < cards.length; i++) {
-    const card = cards[i];
+    const card  = cards[i];
     const entry = state.charts.find(c => c.id === card.id);
 
-    card.classList.add('is-capturing');
-    if (entry?.apexInstance) {
-      await entry.apexInstance.updateOptions({
-        theme: { mode: 'light' },
-        chart: { animations: { enabled: false }, foreColor: '#6b7280' },
-        grid: { borderColor: '#e5e7eb' },
-        tooltip: { theme: 'light' }
-      }, false, false);
-    }
-
-    await new Promise(r => setTimeout(r, 400));
-
-    const dataUrl = await domtoimage.toPng(card, {
-      scale: 2,
-      bgcolor: '#ffffff'   // always white — never bleed page bg into transparent SVG areas
-    });
-
-    const imgH = (card.offsetHeight * imgW) / card.offsetWidth;
-
-    if (i > 0) pdf.addPage();
-    // White page background so the card sits on a clean surface
-    pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 0, pdfW, pdf.internal.pageSize.getHeight(), 'F');
-    pdf.addImage(dataUrl, 'PNG', margin, margin, imgW, imgH);
-
-    card.classList.remove('is-capturing');
-    if (entry?.apexInstance) {
-      entry.apexInstance.updateOptions({
-        theme: { mode: isDark ? 'dark' : 'light' },
-        chart: { animations: { enabled: true }, foreColor: isDark ? '#7d8590' : '#6b7280' },
-        grid: { borderColor: isDark ? '#21282f' : '#e5e7eb' },
-        tooltip: { theme: isDark ? 'dark' : 'light' }
-      }, false, false);
+    try {
+      const dataUrl = await _freezeAndCapture(card, entry, { transparent: false, scale: 2 });
+      if (i > 0) pdf.addPage();
+      _addCardToPdf(pdf, dataUrl, card.offsetWidth, card.offsetHeight);
+    } catch (err) {
+      console.error(`exportAllPDF card ${card.id}:`, err);
     }
   }
 
@@ -2525,16 +2548,15 @@ async function exportAllPDF() {
   showToast('Full report exported', 'success');
 }
 
+/* ── All cards → individual PNG files ──────────────────────────────────── */
 async function exportAllImages() {
   const cards = document.querySelectorAll('.chart-card');
   if (cards.length === 0) return;
 
-  showToast('Exporting all charts as images...', 'success');
+  showToast('Exporting all charts…', 'success');
 
-  // Sequential loop ensures each card has dedicated GPU/CPU focus
   for (const card of cards) {
     await exportCardImage(card.id);
-    // Prevents "File limit reached" or download queuing issues
     await new Promise(r => setTimeout(r, 400));
   }
 }
