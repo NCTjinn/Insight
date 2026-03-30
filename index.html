@@ -2373,73 +2373,176 @@ function updateSelectionBar(){document.getElementById('selection-count').textCon
  *   scale       {number}  – device-pixel ratio multiplier
  */
 async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 } = {}) {
-  // ── Strategy ─────────────────────────────────────────────────────────────
-  // dom-to-image-more cannot reliably render ApexCharts SVGs: the SVG's inline
-  // <style> blocks reference CSS variables that dom-to-image cannot resolve,
-  // so the chart paths render as transparent/invisible in the output.
+  // ── Strategy ──────────────────────────────────────────────────────────────
+  // dom-to-image-more and html2canvas both fail on ApexCharts SVGs because the
+  // SVG's inline <style> blocks use CSS variables that the capture library
+  // cannot resolve in its cloned iframe/document — every chart fill and stroke
+  // becomes transparent.
   //
-  // Fix: use ApexCharts' own dataURI() exporter (which works correctly) to get
-  // a PNG of the chart area, temporarily replace the live .apexcharts-canvas
-  // with a plain <img> tag, then run dom-to-image on the card.  dom-to-image
-  // then only sees ordinary HTML elements — no SVG or canvas — and works fine.
+  // Solution: compose the export image manually on an HTML5 Canvas:
+  //   1. Use ApexCharts' own dataURI() to get a correct PNG of the chart.
+  //   2. Read the card title and (optional) AI summary text directly from the DOM.
+  //   3. Draw background → title → chart PNG → summary text onto a canvas.
+  //
+  // This completely bypasses dom-to-image for the chart area and always works.
 
-  card.classList.add('is-capturing');
+  const DPR    = scale;
+  const BG     = transparent ? null : '#ffffff';
+  const FG     = '#111827';
+  const MUTED  = '#6b7280';
+  const BORDER = '#e5e7eb';
+  const RADIUS = 12;
+  const PAD    = 20;          // inner padding (px, logical)
+  const TITLE_SIZE  = 15;
+  const BODY_SIZE   = 13;
+  const LINE_HEIGHT = 1.65;
 
-  // ── 1. Snapshot the chart via ApexCharts' own exporter ───────────────────
-  let chartWrapper = null;   // the .apexcharts-canvas parent div
-  let placeholder  = null;   // the <img> we inject
+  // ── 1. Collect card metrics ──────────────────────────────────────────────
+  const cardW = card.offsetWidth;
 
+  // Title
+  const titleEl = card.querySelector('.card-title');
+  const titleText = (titleEl?.textContent || entry?.title || '').trim();
+
+  // Chart image via ApexCharts' own renderer
+  let chartImg = null;
+  let chartNaturalH = 0;
   if (entry?.apexInstance) {
     try {
       const { imgURI } = await entry.apexInstance.dataURI();
-
-      // Find the wrapper div that ApexCharts renders into (id="apex-{entry.id}")
-      chartWrapper = card.querySelector(`#apex-${entry.id}`);
-      const canvas  = chartWrapper?.querySelector('.apexcharts-canvas');
-
-      if (canvas && imgURI) {
-        placeholder = document.createElement('img');
-        placeholder.src    = imgURI;
-        placeholder.width  = canvas.offsetWidth;
-        placeholder.height = canvas.offsetHeight;
-        placeholder.style.cssText = 'display:block;max-width:100%';
-        // Hide the live canvas, insert the static snapshot in its place
-        canvas.style.visibility = 'hidden';
-        canvas.style.position   = 'absolute';
-        chartWrapper.insertBefore(placeholder, canvas);
+      if (imgURI && imgURI !== 'data:,') {
+        chartImg = await new Promise((res, rej) => {
+          const img = new Image();
+          img.onload = () => res(img);
+          img.onerror = rej;
+          img.src = imgURI;
+        });
+        chartNaturalH = chartImg.naturalHeight / (chartImg.naturalWidth / (cardW - PAD * 2)) || 0;
       }
-    } catch (_) {
-      // dataURI() unavailable (e.g. stats card) — fall through and let
-      // dom-to-image try its best with the live DOM.
-    }
+    } catch (_) {}
   }
 
-  // Allow the browser one frame to lay out the injected <img>
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // AI summary text (only if visible)
+  const summaryBox = card.querySelector('.ai-summary-box');
+  const summaryVisible = summaryBox && summaryBox.classList.contains('visible');
+  const summaryText = summaryVisible
+    ? (summaryBox.innerText || summaryBox.textContent || '').trim()
+    : '';
 
-  // ── 2. Capture the card ──────────────────────────────────────────────────
-  const captureOpts = {
-    scale,
-    width:  card.offsetWidth,
-    height: card.offsetHeight,
-  };
-  if (!transparent) captureOpts.bgcolor = '#ffffff';
+  // ── 2. Measure total canvas height ──────────────────────────────────────
+  // We need to know the wrapped-text height for the summary before drawing.
+  // Use an offscreen canvas to pre-measure line wrapping.
+  const drawW = cardW - PAD * 2;
 
-  const dataUrl = await domtoimage.toPng(card, captureOpts);
-
-  // ── 3. Restore the live chart ────────────────────────────────────────────
-  card.classList.remove('is-capturing');
-
-  if (placeholder) {
-    placeholder.remove();
-    const canvas = chartWrapper?.querySelector('.apexcharts-canvas');
-    if (canvas) {
-      canvas.style.visibility = '';
-      canvas.style.position   = '';
+  function measureWrappedText(ctx, text, fontSize, maxWidth) {
+    if (!text) return 0;
+    ctx.font = `${fontSize}px 'Outfit', sans-serif`;
+    const words = text.split(' ');
+    let line = '', lines = 1;
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > maxWidth && line) {
+        line = w; lines++;
+      } else { line = test; }
     }
+    return lines * fontSize * LINE_HEIGHT;
   }
 
-  return dataUrl;
+  const offscreen = document.createElement('canvas');
+  offscreen.width = cardW * DPR;
+  const octx = offscreen.getContext('2d');
+  octx.scale(DPR, DPR);
+
+  const titleH   = TITLE_SIZE * LINE_HEIGHT + 12;   // title row + gap below
+  const chartH   = chartImg ? chartNaturalH : 0;
+  const summaryH = summaryText
+    ? (24 + measureWrappedText(octx, summaryText, BODY_SIZE, drawW - PAD * 2) + PAD)
+    : 0;
+
+  const totalH = PAD + titleH + chartH + (summaryText ? PAD / 2 : 0) + summaryH + PAD;
+
+  // ── 3. Draw onto the real canvas ─────────────────────────────────────────
+  const canvas = document.createElement('canvas');
+  canvas.width  = cardW  * DPR;
+  canvas.height = totalH * DPR;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(DPR, DPR);
+
+  // Background + rounded rect
+  if (BG) {
+    ctx.fillStyle = BG;
+    roundRect(ctx, 0, 0, cardW, totalH, RADIUS);
+    ctx.fill();
+  } else {
+    ctx.clearRect(0, 0, cardW, totalH);
+  }
+
+  let y = PAD;
+
+  // Title
+  ctx.fillStyle = FG;
+  ctx.font = `700 ${TITLE_SIZE}px 'Outfit', sans-serif`;
+  ctx.fillText(titleText, PAD, y + TITLE_SIZE);
+  y += titleH;
+
+  // Chart image
+  if (chartImg) {
+    ctx.drawImage(chartImg, PAD, y, drawW, chartNaturalH);
+    y += chartH;
+  }
+
+  // AI summary box
+  if (summaryText) {
+    y += PAD / 2;
+    const boxX = PAD, boxY = y, boxW = drawW, boxH = summaryH;
+
+    // Box background
+    ctx.fillStyle = '#f6f8fa';
+    roundRect(ctx, boxX, boxY, boxW, boxH, 8);
+    ctx.fill();
+    ctx.strokeStyle = BORDER;
+    ctx.lineWidth = 1;
+    roundRect(ctx, boxX, boxY, boxW, boxH, 8);
+    ctx.stroke();
+
+    // Summary label
+    ctx.fillStyle = '#008f72';
+    ctx.font = `600 10px 'Outfit', sans-serif`;
+    ctx.fillText('AI SUMMARY', boxX + PAD, boxY + 16);
+
+    // Summary body — word-wrap
+    ctx.fillStyle = MUTED;
+    ctx.font = `${BODY_SIZE}px 'Outfit', sans-serif`;
+    let ty = boxY + 16 + BODY_SIZE * LINE_HEIGHT;
+    const words = summaryText.replace(/\n+/g, ' ').split(' ');
+    let line = '';
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > boxW - PAD * 2 && line) {
+        ctx.fillText(line, boxX + PAD, ty);
+        ty += BODY_SIZE * LINE_HEIGHT;
+        line = w;
+      } else { line = test; }
+    }
+    if (line) ctx.fillText(line, boxX + PAD, ty);
+  }
+
+  return canvas.toDataURL('image/png');
+}
+
+/** Draw a rounded rectangle path (does not stroke/fill). */
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 /**
