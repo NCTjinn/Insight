@@ -222,7 +222,7 @@
     .chart-card.is-capturing .card-inner {
       border-radius: 0 !important;
       overflow: hidden !important;
-      background: #ffffff !important;
+      background: transparent !important;
       color: #111827 !important;
     }
 
@@ -1203,7 +1203,6 @@ function buildCardDOM(entry){
         <div class="stats-value" id="stats-value-${entry.id}">—</div>
         <div class="stats-column-label" id="stats-col-label-${entry.id}"></div>
         <div id="stats-filter-pill-${entry.id}"></div>
-        <div class="stats-count" id="stats-count-${entry.id}"></div>
       </div>`
     : `<div class="card-chart" id="apex-${entry.id}"></div>`;
   
@@ -1344,7 +1343,6 @@ function renderStatsCard(entry) {
   const valueEl    = document.getElementById('stats-value-'  + entry.id);
   const colLabelEl = document.getElementById('stats-col-label-' + entry.id);
   const pillEl     = document.getElementById('stats-filter-pill-' + entry.id);
-  const countEl    = document.getElementById('stats-count-'  + entry.id);
 
   if (!valueEl) return;
 
@@ -1354,7 +1352,6 @@ function renderStatsCard(entry) {
 
   if (!result || result.value === null) {
     valueEl.textContent = '—';
-    if (countEl) countEl.textContent = 'No matching rows';
     return;
   }
 
@@ -1378,7 +1375,6 @@ function renderStatsCard(entry) {
       pillEl.innerHTML = '';
     }
   }
-  if (countEl) countEl.textContent = `${result.count.toLocaleString()} row${result.count !== 1 ? 's' : ''}`;
 }
 
 /* ============================================================
@@ -2449,16 +2445,16 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
           chart: { foreColor: '#111827', background: 'transparent' },
           grid:  { borderColor: '#e5e7eb' },
           legend: { labels: { colors: '#111827' } },
-          markers: { colors: Array(30).fill('#111827'), strokeColors: '#111827' },
+          markers: { size: 4, colors: Array(30).fill('#111827'), strokeColors: '#111827', strokeWidth: 2 },
         }, false, false);
         // One rAF so the SVG re-paints before we snapshot
         await new Promise(r => requestAnimationFrame(r));
       } catch (_) {}
     } else {
-      // Light mode: just force markers dark; background already transparent
+      // Light mode: force markers dark and visible; background already transparent
       try {
         await entry.apexInstance.updateOptions({
-          markers: { colors: Array(30).fill('#111827'), strokeColors: '#111827' },
+          markers: { size: 4, colors: Array(30).fill('#111827'), strokeColors: '#111827', strokeWidth: 2 },
         }, false, false);
         await new Promise(r => requestAnimationFrame(r));
       } catch (_) {}
@@ -2485,12 +2481,12 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
           chart: { foreColor: '#7d8590', background: 'transparent' },
           grid:  { borderColor: '#21282f' },
           legend: { labels: { colors: '#7d8590' } },
-          markers: {},
+          markers: { size: 0.01, colors: undefined, strokeColors: undefined },
         }, false, false);
       } catch (_) {}
     } else {
       try {
-        entry.apexInstance.updateOptions({ markers: {} }, false, false);
+        entry.apexInstance.updateOptions({ markers: { size: 0.01, colors: undefined, strokeColors: undefined } }, false, false);
       } catch (_) {}
     }
   }
