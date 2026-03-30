@@ -2460,15 +2460,6 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
       } catch (_) {}
     }
 
-    const apexEl = document.getElementById('apex-' + entry.id);
-    const bgRects = [];
-    if (apexEl) {
-      apexEl.querySelectorAll('rect.apexcharts-background').forEach(r => {
-        bgRects.push([r, r.getAttribute('fill')]);
-        r.setAttribute('fill', 'none');
-      });
-    }
-
     try {
       const { imgURI } = await entry.apexInstance.dataURI();
       if (imgURI && imgURI !== 'data:,') {
@@ -2481,8 +2472,6 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
         chartNaturalH = chartImg.naturalHeight / (chartImg.naturalWidth / (cardW - PAD * 2)) || 0;
       }
     } catch (_) {}
-
-    bgRects.forEach(([r, fill]) => r.setAttribute('fill', fill || ''));
 
     // Restore original theme
     if (isDark) {
