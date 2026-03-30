@@ -410,6 +410,18 @@
     .drag-handle{cursor:grab;color:var(--text-faint);display:flex;align-items:center}
     .drag-handle:active{cursor:grabbing}
 
+    /* Stats Card */
+    .stats-card-body{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 24px 24px;min-height:200px;gap:8px;text-align:center}
+    .stats-value{font-size:52px;font-weight:800;letter-spacing:-2px;color:var(--accent);line-height:1;transition:all var(--t)}
+    .stats-metric-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);background:var(--surface2);border:1px solid var(--border-lit);border-radius:20px;padding:3px 10px}
+    .stats-column-label{font-size:13px;color:var(--text-muted);font-weight:500;margin-top:2px}
+    .stats-filter-pill{display:inline-flex;align-items:center;gap:5px;margin-top:6px;background:var(--accent2-dim);border:1px solid rgba(245,158,11,0.25);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--accent2);font-weight:500}
+    .stats-count{font-size:11px;color:var(--text-faint);margin-top:4px}
+
+    /* Filter row in modal */
+    .filter-row{display:flex;gap:8px;align-items:flex-end}
+    .filter-op-select{width:72px;flex-shrink:0}
+
     /* Scrollbar */
     ::-webkit-scrollbar{width:6px;height:6px}
     ::-webkit-scrollbar-track{background:transparent}
@@ -449,7 +461,7 @@
     <h3 class="modal-title">Add New Chart</h3>
     <p class="modal-sub">Choose a chart type and configure the axes.</p>
     <label class="input-label">Chart Type</label>
-    <div class="chart-type-grid">
+    <div class="chart-type-grid" style="grid-template-columns:repeat(5,1fr)">
       <button class="chart-type-btn selected" data-type="line" onclick="selectChartType(this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,17 7,11 11,14 15,8 21,3"/><polyline points="3,21 21,21"/></svg>Line
       </button>
@@ -462,23 +474,75 @@
       <button class="chart-type-btn" data-type="donut" onclick="selectChartType(this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>Donut
       </button>
+      <button class="chart-type-btn" data-type="stats" onclick="selectChartType(this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/><circle cx="12" cy="12" r="3" fill="currentColor" opacity=".3"/></svg>Stats
+      </button>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="input-label">X Axis</label>
-        <select class="select-field" id="modal-x-axis"></select>
+
+    <!-- Axes row (hidden for stats type) -->
+    <div id="modal-axes-wrap">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="input-label">X Axis</label>
+          <select class="select-field" id="modal-x-axis"></select>
+        </div>
+        <div class="form-group">
+          <label class="input-label">Y Axis</label>
+          <select class="select-field" id="modal-y-axis"></select>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="input-label">Y Axis</label>
-        <select class="select-field" id="modal-y-axis"></select>
+      <div class="form-group" style="margin-top:12px" id="modal-groupby-wrap">
+        <label class="input-label">Group By <span style="font-size:10px;color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:400;">(optional — creates multiple series)</span></label>
+        <select class="select-field" id="modal-groupby">
+          <option value="">None (single series)</option>
+        </select>
       </div>
     </div>
-    <div class="form-group" style="margin-top:12px" id="modal-groupby-wrap">
-      <label class="input-label">Group By <span style="font-size:10px;color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:400;">(optional — creates multiple series)</span></label>
-      <select class="select-field" id="modal-groupby">
-        <option value="">None (single series)</option>
-      </select>
+
+    <!-- Stats-specific fields (shown only for stats type) -->
+    <div id="modal-stats-wrap" style="display:none">
+      <div class="form-row" style="margin-top:4px">
+        <div class="form-group">
+          <label class="input-label">Value Column</label>
+          <select class="select-field" id="modal-stats-col"></select>
+        </div>
+        <div class="form-group">
+          <label class="input-label">Statistic</label>
+          <select class="select-field" id="modal-stats-metric">
+            <option value="mean">Mean (Average)</option>
+            <option value="median">Median</option>
+            <option value="mode">Mode</option>
+            <option value="min">Minimum</option>
+            <option value="max">Maximum</option>
+          </select>
+        </div>
+      </div>
     </div>
+
+    <!-- Filter section (shown for all types) -->
+    <div class="form-group" style="margin-top:14px">
+      <label class="input-label">Filter <span style="font-size:10px;color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:400;">(optional — restrict rows before computing)</span></label>
+      <div class="filter-row">
+        <div class="form-group" style="flex:1.8">
+          <select class="select-field" id="modal-filter-col">
+            <option value="">No filter</option>
+          </select>
+        </div>
+        <div class="form-group filter-op-select">
+          <select class="select-field" id="modal-filter-op">
+            <option value="=">=</option>
+            <option value="<">&lt;</option>
+            <option value=">">&gt;</option>
+            <option value="<=">&le;</option>
+            <option value=">=">&ge;</option>
+          </select>
+        </div>
+        <div class="form-group" style="flex:1.5">
+          <input class="input-field" id="modal-filter-val" type="text" placeholder="value…" />
+        </div>
+      </div>
+    </div>
+
     <div class="form-group" style="margin-top:12px">
       <label class="input-label">Chart Title</label>
       <input class="input-field" id="modal-title" type="text" placeholder="e.g. Revenue by Month" />
@@ -950,9 +1014,13 @@ function populateAxisDropdowns(columns){
   const xSel=document.getElementById('modal-x-axis');
   const ySel=document.getElementById('modal-y-axis');
   const gbSel=document.getElementById('modal-groupby');
+  const statsSel=document.getElementById('modal-stats-col');
+  const filterSel=document.getElementById('modal-filter-col');
   xSel.innerHTML='';
   ySel.innerHTML='';
   gbSel.innerHTML='<option value="">None (single series)</option>';
+  statsSel.innerHTML='';
+  filterSel.innerHTML='<option value="">No filter</option>';
   columns.forEach(col=>{
     const ox=document.createElement('option');
     ox.value=col.name; ox.textContent=`${col.name} (${col.role})`;
@@ -960,11 +1028,21 @@ function populateAxisDropdowns(columns){
     const oy=document.createElement('option');
     oy.value=col.name; oy.textContent=`${col.name} (${col.role})`;
     ySel.appendChild(oy);
+    // Filter column: all columns
+    const of2=document.createElement('option');
+    of2.value=col.name; of2.textContent=`${col.name} (${col.role})`;
+    filterSel.appendChild(of2);
     // Only categorical columns make sense as group-by keys
     if(col.role==='categorical'){
       const og=document.createElement('option');
       og.value=col.name; og.textContent=`${col.name} (${col.role})`;
       gbSel.appendChild(og);
+    }
+    // Stats column: prefer numeric, but allow any
+    if(col.role==='numeric'){
+      const os=document.createElement('option');
+      os.value=col.name; os.textContent=`${col.name} (${col.role})`;
+      statsSel.appendChild(os);
     }
   });
   // Default: x = first date/datetime/categorical, y = first numeric
@@ -972,6 +1050,7 @@ function populateAxisDropdowns(columns){
   const yDefault=columns.find(c=>c.role==='numeric');
   if(xDefault) xSel.value=xDefault.name;
   if(yDefault) ySel.value=yDefault.name;
+  if(yDefault) statsSel.value=yDefault.name;
 }
 
 /* ============================================================
@@ -1059,10 +1138,17 @@ function addChart(opts){
     id,
     title:    opts.title||'New Chart',
     type:     opts.type||'line',
-    // Real data keys
+    // Regular chart keys
     xColumn:  opts.xColumn||null,
     yColumn:  opts.yColumn||null,
     groupByColumn: opts.groupByColumn||null,
+    // Stats card keys
+    statColumn:  opts.statColumn||null,
+    statMetric:  opts.statMetric||'mean',
+    // Filter
+    filterColumn:   opts.filterColumn||null,
+    filterOperator: opts.filterOperator||'=',
+    filterValue:    opts.filterValue||'',
     apexInstance:null,summaryText:null,summaryLoaded:false,
   };
   state.charts.push(entry);
@@ -1082,6 +1168,34 @@ function buildCardDOM(entry){
   const card=document.createElement('div');
   card.className='chart-card';card.id=entry.id;
   card.setAttribute('draggable','true');card.setAttribute('data-id',entry.id);
+
+  // Hint text below title
+  let titleHint = 'Click title to edit';
+  if (entry.type === 'stats') {
+    const metricLabels={mean:'Mean',median:'Median',mode:'Mode',min:'Min',max:'Max'};
+    titleHint = `${metricLabels[entry.statMetric]||entry.statMetric} of <strong>${entry.statColumn||'—'}</strong>`;
+    if (entry.filterColumn && entry.filterValue !== '') {
+      titleHint += ` · ${entry.filterColumn} ${entry.filterOperator} "${entry.filterValue}"`;
+    }
+  } else if (entry.groupByColumn) {
+    titleHint = `Grouped by <strong>${entry.groupByColumn}</strong>`;
+    if (entry.filterColumn && entry.filterValue !== '') {
+      titleHint += ` · filtered`;
+    }
+  } else if (entry.filterColumn && entry.filterValue !== '') {
+    titleHint = `Filtered: ${entry.filterColumn} ${entry.filterOperator} "${entry.filterValue}"`;
+  }
+
+  const bodyContent = entry.type === 'stats'
+    ? `<div class="stats-card-body" id="stats-${entry.id}">
+        <div class="stats-metric-label" id="stats-metric-${entry.id}">—</div>
+        <div class="stats-value" id="stats-value-${entry.id}">—</div>
+        <div class="stats-column-label" id="stats-col-label-${entry.id}"></div>
+        <div id="stats-filter-pill-${entry.id}"></div>
+        <div class="stats-count" id="stats-count-${entry.id}"></div>
+      </div>`
+    : `<div class="card-chart" id="apex-${entry.id}"></div>`;
+
   card.innerHTML=`
     <input type="checkbox" class="card-checkbox" id="chk-${entry.id}" onchange="toggleCardSelection('${entry.id}')" />
     <div class="card-inner">
@@ -1089,7 +1203,7 @@ function buildCardDOM(entry){
         <div class="card-title-wrap">
           <div class="card-title" contenteditable="true" spellcheck="false"
                onblur="updateChartTitle('${entry.id}',this.textContent)">${entry.title}</div>
-          <div class="card-title-hint">${entry.groupByColumn ? `Grouped by <strong>${entry.groupByColumn}</strong>` : 'Click title to edit'}</div>
+          <div class="card-title-hint">${titleHint}</div>
         </div>
         <div class="card-actions">
           <span class="drag-handle" title="Drag to reorder">
@@ -1128,7 +1242,7 @@ function buildCardDOM(entry){
           </div>
         </div>
       </div>
-      <div class="card-chart" id="apex-${entry.id}"></div>
+      ${bodyContent}
       <div class="card-ai-section">
         <button class="ai-generate-btn" id="ai-btn-${entry.id}" onclick="generateSummary('${entry.id}')">
           <span class="ai-icon">✦</span>Generate AI summary
@@ -1143,6 +1257,114 @@ function buildCardDOM(entry){
       </div>
     </div>`;
   return card;
+}
+
+/* ============================================================
+   ROW FILTER HELPER
+   Returns a Set of row indices that pass entry's filter,
+   or null if no filter is configured.
+============================================================ */
+function getFilteredRowSet(entry) {
+  const ds = state.parsedDataset;
+  if (!ds || !entry.filterColumn || entry.filterValue === '' || entry.filterValue == null) return null;
+  const fCol = ds.columns.find(c => c.name === entry.filterColumn);
+  if (!fCol) return null;
+  const op  = entry.filterOperator || '=';
+  const fVal = String(entry.filterValue);
+  const fNum = parseFloat(fVal);
+  const set  = new Set();
+  fCol.values.forEach((v, i) => {
+    const vStr = String(v ?? '');
+    const vNum = parseFloat(v);
+    let match = false;
+    if (op === '=')  match = vStr === fVal || (isFinite(vNum) && isFinite(fNum) && vNum === fNum);
+    else if (op === '<')  match = isFinite(vNum) && isFinite(fNum) && vNum < fNum;
+    else if (op === '>')  match = isFinite(vNum) && isFinite(fNum) && vNum > fNum;
+    else if (op === '<=') match = isFinite(vNum) && isFinite(fNum) && vNum <= fNum;
+    else if (op === '>=') match = isFinite(vNum) && isFinite(fNum) && vNum >= fNum;
+    if (match) set.add(i);
+  });
+  return set;
+}
+
+/* ============================================================
+   STATS CARD COMPUTATION & RENDER
+============================================================ */
+function computeStatsValue(entry) {
+  const ds = state.parsedDataset;
+  if (!ds || !entry.statColumn) return null;
+  const col = ds.columns.find(c => c.name === entry.statColumn);
+  if (!col) return null;
+
+  const filterSet = getFilteredRowSet(entry);
+  let rawValues = col.values;
+  if (filterSet !== null) rawValues = col.values.filter((_, i) => filterSet.has(i));
+
+  const nums = rawValues.map(v => typeof v === 'number' ? v : parseFloat(v)).filter(v => isFinite(v));
+  if (nums.length === 0) return { value: null, count: 0 };
+
+  const metric = entry.statMetric || 'mean';
+  let value;
+  if (metric === 'mean')   value = nums.reduce((a, b) => a + b, 0) / nums.length;
+  else if (metric === 'median') {
+    const s = [...nums].sort((a, b) => a - b);
+    const n = s.length;
+    value = n % 2 === 0 ? (s[n/2-1] + s[n/2]) / 2 : s[Math.floor(n/2)];
+  }
+  else if (metric === 'mode') {
+    const freq = new Map();
+    nums.forEach(v => freq.set(v, (freq.get(v) || 0) + 1));
+    let maxF = 0; value = nums[0];
+    freq.forEach((f, v) => { if (f > maxF) { maxF = f; value = v; } });
+  }
+  else if (metric === 'min') value = Math.min(...nums);
+  else if (metric === 'max') value = Math.max(...nums);
+  return { value, count: nums.length };
+}
+
+function renderStatsCard(entry) {
+  const result = computeStatsValue(entry);
+  const metricLabels = { mean:'Mean', median:'Median', mode:'Mode', min:'Minimum', max:'Maximum' };
+
+  const metricEl   = document.getElementById('stats-metric-' + entry.id);
+  const valueEl    = document.getElementById('stats-value-'  + entry.id);
+  const colLabelEl = document.getElementById('stats-col-label-' + entry.id);
+  const pillEl     = document.getElementById('stats-filter-pill-' + entry.id);
+  const countEl    = document.getElementById('stats-count-'  + entry.id);
+
+  if (!valueEl) return;
+
+  const metricName = metricLabels[entry.statMetric] || entry.statMetric || 'Mean';
+  if (metricEl)   metricEl.textContent = metricName;
+  if (colLabelEl) colLabelEl.textContent = entry.statColumn || '—';
+
+  if (!result || result.value === null) {
+    valueEl.textContent = '—';
+    if (countEl) countEl.textContent = 'No matching rows';
+    return;
+  }
+
+  // Format number
+  const v = result.value;
+  let display;
+  if (Math.abs(v) >= 1e9)       display = (v / 1e9).toFixed(2) + 'B';
+  else if (Math.abs(v) >= 1e6)  display = (v / 1e6).toFixed(2) + 'M';
+  else if (Math.abs(v) >= 1000) display = (v / 1000).toFixed(1) + 'K';
+  else if (Number.isInteger(v)) display = v.toLocaleString();
+  else                           display = +v.toFixed(4) % 1 === 0 ? v.toFixed(0) : parseFloat(v.toFixed(2)).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2});
+  valueEl.textContent = display;
+
+  if (pillEl) {
+    if (entry.filterColumn && entry.filterValue !== '') {
+      pillEl.innerHTML = `<span class="stats-filter-pill">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        ${entry.filterColumn} ${entry.filterOperator} "${entry.filterValue}"
+      </span>`;
+    } else {
+      pillEl.innerHTML = '';
+    }
+  }
+  if (countEl) countEl.textContent = `${result.count.toLocaleString()} row${result.count !== 1 ? 's' : ''}`;
 }
 
 /* ============================================================
@@ -1172,8 +1394,15 @@ function getChartData(entry) {
   
   if (!xCol || !yCol) return { labels: [], values: [] };
 
+  // Pre-compute row filter set (null = no filter, include all rows)
+  const filterSet = getFilteredRowSet(entry);
+
   let labels = xCol.labels;
   let values = yCol.values.map(v => typeof v === 'number' ? v : parseFloat(v) || 0);
+
+  // Track whether a time-range slice already happened (so we know if we need
+  // to apply the row filter separately afterwards).
+  let sliced = false;
 
   // 1. Time range slicing
   if ((xCol.role === 'date' || xCol.role === 'datetime') && xCol.values.length > 0) {
@@ -1187,8 +1416,6 @@ function getChartData(entry) {
       let idxs;
       if (state.timeRange === 'CUSTOM' && state.customDateRange) {
         const fromMs = new Date(state.customDateRange.from).getTime();
-        // Add 86399999 ms (23:59:59.999) so the end date is treated as end-of-day,
-        // not midnight — otherwise all same-day datetime rows would be excluded.
         const toMs   = new Date(state.customDateRange.to).getTime() + 86399999;
         idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= fromMs && v <= toMs).map(({ i }) => i);
       } else {
@@ -1196,8 +1423,10 @@ function getChartData(entry) {
         const cutoff = maxDateInData - (days * 86400000);
         idxs = xCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= cutoff).map(({ i }) => i);
       }
+      if (filterSet !== null) idxs = idxs.filter(i => filterSet.has(i));
       labels = idxs.map(i => xCol.labels[i]);
       values = idxs.map(i => yCol.values[i] || 0);
+      sliced = true;
     }
   } else if (xCol.role === 'categorical') {
     // ── Categorical x-axis (bar / donut): locate a date column and use it
@@ -1220,10 +1449,20 @@ function getChartData(entry) {
           const cutoff  = maxDate - (days * 86400000);
           idxs = dateCol.values.map((v, i) => ({ v, i })).filter(({ v }) => v !== null && v >= cutoff).map(({ i }) => i);
         }
+        if (filterSet !== null) idxs = idxs.filter(i => filterSet.has(i));
         labels = idxs.map(i => xCol.labels ? xCol.labels[i] : String(xCol.values[i]));
         values = idxs.map(i => yCol.values[i] || 0);
+        sliced = true;
       }
     }
+  }
+
+  // If no time-range slice happened but a row filter is active, apply it now.
+  if (!sliced && filterSet !== null) {
+    const totalRows = xCol.values ? xCol.values.length : (xCol.labels ? xCol.labels.length : 0);
+    const idxs = Array.from({length: totalRows}, (_, i) => i).filter(i => filterSet.has(i));
+    labels = idxs.map(i => xCol.labels ? xCol.labels[i] : String(xCol.values?.[i] ?? ''));
+    values = idxs.map(i => { const v = yCol.values[i]; return typeof v === 'number' ? v : parseFloat(v) || 0; });
   }
 
   // 2. AGGREGATION: Group values by label to prevent chart clutter.
@@ -1274,8 +1513,12 @@ function getCombinedChartData(entry) {
 
   if (!xCol || !yCol || !groupCol) return { labels: [], series: [] };
 
-  // --- 1. Build index list (optionally time-filtered) ---
+  // --- 1. Build index list (optionally time-filtered + row-filtered) ---
   let idxs = xCol.values.map((_, i) => i);
+
+  // Apply row filter first
+  const filterSet = getFilteredRowSet(entry);
+  if (filterSet !== null) idxs = idxs.filter(i => filterSet.has(i));
 
   if (xCol.role === 'date' || xCol.role === 'datetime') {
     const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
@@ -1367,6 +1610,12 @@ function getCombinedChartData(entry) {
    APEX CHARTS
 ============================================================ */
 function initApexChart(entry){
+  // Stats card — no ApexCharts needed, render the stat value directly
+  if (entry.type === 'stats') {
+    renderStatsCard(entry);
+    return;
+  }
+
   const d=document.documentElement.getAttribute('data-theme')==='dark';
   const ac='#00d4aa',ac2='#f59e0b',dng='#f85149',suc='#3fb950';
   const PALETTE=[ac,'#0099ff','#7c3aed',ac2,suc,dng,'#ec4899','#14b8a6','#f97316','#8b5cf6'];
@@ -1519,6 +1768,12 @@ function initApexChart(entry){
 
 function updateAllCharts(){
   state.charts.forEach(entry=>{
+    // Stats cards re-compute their value in place
+    if (entry.type === 'stats') {
+      renderStatsCard(entry);
+      return;
+    }
+
     if(!entry.apexInstance)return;
 
     // ── Combined multi-series ────────────────────────────────────────────────
@@ -1951,11 +2206,30 @@ function autoGenerateChart(){
    ADD CHART MODAL
 ============================================================ */
 function openModal(){
-  // Reset group-by selection and ensure Group By row is visible (re-select Line by default)
+  // Reset selections back to line type
+  document.querySelectorAll('.chart-type-btn').forEach(b=>b.classList.remove('selected'));
+  const lineBtn = document.querySelector('.chart-type-btn[data-type="line"]');
+  if (lineBtn) lineBtn.classList.add('selected');
+  state.selectedChartType = 'line';
+
+  // Reset group-by, filter, stats fields
   const gbSel = document.getElementById('modal-groupby');
   if (gbSel) gbSel.value = '';
+  const filterCol = document.getElementById('modal-filter-col');
+  if (filterCol) filterCol.value = '';
+  const filterVal = document.getElementById('modal-filter-val');
+  if (filterVal) filterVal.value = '';
+  const filterOp = document.getElementById('modal-filter-op');
+  if (filterOp) filterOp.value = '=';
+
+  // Show/hide correct panels for line type
+  const axesWrap = document.getElementById('modal-axes-wrap');
+  if (axesWrap) axesWrap.style.display = '';
+  const statsWrap = document.getElementById('modal-stats-wrap');
+  if (statsWrap) statsWrap.style.display = 'none';
   const gbWrap = document.getElementById('modal-groupby-wrap');
-  if (gbWrap) gbWrap.style.display = state.selectedChartType === 'donut' ? 'none' : '';
+  if (gbWrap) gbWrap.style.display = '';
+
   document.getElementById('modal-overlay').classList.add('open');
 }
 function closeModal(e){if(!e||e.target===document.getElementById('modal-overlay'))document.getElementById('modal-overlay').classList.remove('open')}
@@ -1963,28 +2237,67 @@ function selectChartType(btn){
   document.querySelectorAll('.chart-type-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   state.selectedChartType=btn.getAttribute('data-type');
-  // Group By is not applicable for donut charts
+  const isStats = state.selectedChartType === 'stats';
+  // Axes row and group-by: hidden for stats type
+  const axesWrap = document.getElementById('modal-axes-wrap');
+  if (axesWrap) axesWrap.style.display = isStats ? 'none' : '';
+  // Stats-specific fields: shown only for stats type
+  const statsWrap = document.getElementById('modal-stats-wrap');
+  if (statsWrap) statsWrap.style.display = isStats ? '' : 'none';
+  // Group By is not applicable for donut or stats charts
   const gbWrap=document.getElementById('modal-groupby-wrap');
-  if(gbWrap) gbWrap.style.display=state.selectedChartType==='donut'?'none':'';
+  if(gbWrap) gbWrap.style.display=(state.selectedChartType==='donut'||isStats)?'none':'';
 }
 function addChartFromModal(){
-  const title=document.getElementById('modal-title').value.trim();
-  const xCol=document.getElementById('modal-x-axis').value;
-  const yCol=document.getElementById('modal-y-axis').value;
-  const groupByCol=document.getElementById('modal-groupby').value||null;
+  const title       = document.getElementById('modal-title').value.trim();
+  const filterCol   = document.getElementById('modal-filter-col').value || null;
+  const filterOp    = document.getElementById('modal-filter-op').value || '=';
+  const filterVal   = document.getElementById('modal-filter-val').value.trim();
 
-  if(state.parsedDataset){
-    const autoTitle=groupByCol
+  if(!state.parsedDataset){
+    showToast('Upload a file to create custom charts.', 'error'); return;
+  }
+
+  const isStats = state.selectedChartType === 'stats';
+
+  if (isStats) {
+    const statCol    = document.getElementById('modal-stats-col').value;
+    const statMetric = document.getElementById('modal-stats-metric').value;
+    const metricLabels = { mean:'Mean', median:'Median', mode:'Mode', min:'Min', max:'Max' };
+    let autoTitle = `${metricLabels[statMetric]||statMetric} of ${statCol}`;
+    if (filterCol && filterVal) autoTitle += ` (${filterCol} ${filterOp} "${filterVal}")`;
+    addChart({
+      title:          title || autoTitle,
+      type:           'stats',
+      statColumn:     statCol,
+      statMetric,
+      filterColumn:   filterCol,
+      filterOperator: filterOp,
+      filterValue:    filterVal,
+    });
+  } else {
+    const xCol      = document.getElementById('modal-x-axis').value;
+    const yCol      = document.getElementById('modal-y-axis').value;
+    const groupByCol= document.getElementById('modal-groupby').value || null;
+    const autoTitle = groupByCol
       ? `${yCol} by ${groupByCol} over ${xCol}`
       : `${yCol} by ${xCol}`;
-    addChart({title:title||autoTitle,type:state.selectedChartType,xColumn:xCol,yColumn:yCol,groupByColumn:state.selectedChartType==='donut'?null:groupByCol});
-    closeModal();
-    document.getElementById('modal-title').value='';
-    document.getElementById('modal-groupby').value='';
-    showToast('Chart added','success');
-  } else {
-    showToast('Upload a file to create custom charts.', 'error');
+    addChart({
+      title:          title || autoTitle,
+      type:           state.selectedChartType,
+      xColumn:        xCol,
+      yColumn:        yCol,
+      groupByColumn:  state.selectedChartType === 'donut' ? null : groupByCol,
+      filterColumn:   filterCol,
+      filterOperator: filterOp,
+      filterValue:    filterVal,
+    });
   }
+
+  closeModal();
+  document.getElementById('modal-title').value = '';
+  document.getElementById('modal-groupby').value = '';
+  showToast('Chart added','success');
 }
 
 /* ============================================================
@@ -2231,6 +2544,11 @@ function saveSession(){
         id: c.id, title: c.title, type: c.type,
         xColumn: c.xColumn, yColumn: c.yColumn,
         groupByColumn: c.groupByColumn || null,
+        statColumn: c.statColumn || null,
+        statMetric: c.statMetric || 'mean',
+        filterColumn:   c.filterColumn   || null,
+        filterOperator: c.filterOperator || '=',
+        filterValue:    c.filterValue    || '',
         summaryText: c.summaryText,
         fullWidth: card ? card.classList.contains('full-width') : false,
       };
@@ -2256,7 +2574,16 @@ function loadSession(session){
   state.nextId = 1;
 
   session.charts.forEach(cfg=>{
-    const entry=addChart({title:cfg.title,type:cfg.type,xColumn:cfg.xColumn,yColumn:cfg.yColumn,groupByColumn:cfg.groupByColumn||null});
+    const entry=addChart({
+      title:cfg.title, type:cfg.type,
+      xColumn:cfg.xColumn, yColumn:cfg.yColumn,
+      groupByColumn:cfg.groupByColumn||null,
+      statColumn:cfg.statColumn||null,
+      statMetric:cfg.statMetric||'mean',
+      filterColumn:cfg.filterColumn||null,
+      filterOperator:cfg.filterOperator||'=',
+      filterValue:cfg.filterValue||'',
+    });
     if(cfg.fullWidth){
       requestAnimationFrame(()=>{
         const card=document.getElementById(entry.id);
@@ -2301,11 +2628,16 @@ function saveTemplate(){
       if (!entry) return null;
       const card = document.getElementById(id);
       return {
-        title:     entry.title,
-        type:      entry.type,
-        xColumn:   entry.xColumn,
-        yColumn:   entry.yColumn,
-        groupByColumn: entry.groupByColumn || null,
+        title:          entry.title,
+        type:           entry.type,
+        xColumn:        entry.xColumn,
+        yColumn:        entry.yColumn,
+        groupByColumn:  entry.groupByColumn  || null,
+        statColumn:     entry.statColumn     || null,
+        statMetric:     entry.statMetric     || 'mean',
+        filterColumn:   entry.filterColumn   || null,
+        filterOperator: entry.filterOperator || '=',
+        filterValue:    entry.filterValue    || '',
         fullWidth: card ? card.classList.contains('full-width') : false,
       };
     }).filter(Boolean),
@@ -2354,11 +2686,16 @@ function applyTemplate(tpl){
   // ── Re-create charts in template order ─────────────────────────────────────
   tpl.charts.forEach(cfg => {
     const entry = addChart({
-      title:   cfg.title,
-      type:    cfg.type,
-      xColumn: cfg.xColumn,
-      yColumn: cfg.yColumn,
-      groupByColumn: cfg.groupByColumn || null,
+      title:          cfg.title,
+      type:           cfg.type,
+      xColumn:        cfg.xColumn,
+      yColumn:        cfg.yColumn,
+      groupByColumn:  cfg.groupByColumn  || null,
+      statColumn:     cfg.statColumn     || null,
+      statMetric:     cfg.statMetric     || 'mean',
+      filterColumn:   cfg.filterColumn   || null,
+      filterOperator: cfg.filterOperator || '=',
+      filterValue:    cfg.filterValue    || '',
     });
     if (cfg.fullWidth) {
       // Apply full-width after the card is in the DOM
