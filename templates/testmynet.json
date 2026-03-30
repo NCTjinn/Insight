@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "type": "template",
-  "savedAt": "2026-03-29T17:03:20.356Z",
+  "savedAt": "2026-03-30T02:19:30.882Z",
   "dateRange": {
     "timeRange": "1Y",
     "customDateRange": null
@@ -13,7 +13,90 @@
       "xColumn": "DateD M d Y @ g:i:s a",
       "yColumn": "Mbps",
       "groupByColumn": "Type",
+      "statColumn": null,
+      "statMetric": "mean",
+      "filterColumn": null,
+      "filterOperator": "=",
+      "filterValue": "",
       "fullWidth": true
+    },
+    {
+      "title": "Median Download Speed",
+      "type": "stats",
+      "xColumn": null,
+      "yColumn": null,
+      "groupByColumn": null,
+      "statColumn": "Mbps",
+      "statMetric": "median",
+      "filterColumn": "Type",
+      "filterOperator": "=",
+      "filterValue": "DN",
+      "fullWidth": false
+    },
+    {
+      "title": "Median Upload Speed",
+      "type": "stats",
+      "xColumn": null,
+      "yColumn": null,
+      "groupByColumn": null,
+      "statColumn": "Mbps",
+      "statMetric": "median",
+      "filterColumn": "Type",
+      "filterOperator": "=",
+      "filterValue": "UP",
+      "fullWidth": false
+    },
+    {
+      "title": "Maximum Download Speed",
+      "type": "stats",
+      "xColumn": null,
+      "yColumn": null,
+      "groupByColumn": null,
+      "statColumn": "Mbps",
+      "statMetric": "max",
+      "filterColumn": "Type",
+      "filterOperator": "=",
+      "filterValue": "DN",
+      "fullWidth": false
+    },
+    {
+      "title": "Maximum Upload Speed",
+      "type": "stats",
+      "xColumn": null,
+      "yColumn": null,
+      "groupByColumn": null,
+      "statColumn": "Mbps",
+      "statMetric": "max",
+      "filterColumn": "Type",
+      "filterOperator": "=",
+      "filterValue": "UP",
+      "fullWidth": false
+    },
+    {
+      "title": "Minimum Download Speed",
+      "type": "stats",
+      "xColumn": null,
+      "yColumn": null,
+      "groupByColumn": null,
+      "statColumn": "Mbps",
+      "statMetric": "min",
+      "filterColumn": "Type",
+      "filterOperator": "=",
+      "filterValue": "DN",
+      "fullWidth": false
+    },
+    {
+      "title": "Minimum Upload Speed",
+      "type": "stats",
+      "xColumn": null,
+      "yColumn": null,
+      "groupByColumn": null,
+      "statColumn": "Mbps",
+      "statMetric": "min",
+      "filterColumn": "Type",
+      "filterOperator": "=",
+      "filterValue": "UP",
+      "fullWidth": false
     }
   ]
 }
