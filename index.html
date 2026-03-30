@@ -1700,7 +1700,7 @@ function initApexChart(entry){
         padding: { left: 16, right: 10, top: 0, bottom: 0 },
       },
       markers: {
-        size: 0,
+        size: 0.01,
         hover: { size: 5, sizeOffset: 0 },
       },
       states: {
@@ -2445,7 +2445,7 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
           chart: { foreColor: '#111827', background: 'transparent' },
           grid:  { borderColor: '#e5e7eb' },
           legend: { labels: { colors: '#111827' } },
-          markers: { size: 4, colors: Array(30).fill('#111827'), strokeColors: '#111827', strokeWidth: 2 },
+          markers: { size: 2, colors: Array(30).fill('#111827'), strokeColors: '#111827', strokeWidth: 2 },
         }, false, false);
         // One rAF so the SVG re-paints before we snapshot
         await new Promise(r => requestAnimationFrame(r));
@@ -2454,7 +2454,7 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
       // Light mode: force markers dark and visible; background already transparent
       try {
         await entry.apexInstance.updateOptions({
-          markers: { size: 4, colors: Array(30).fill('#111827'), strokeColors: '#111827', strokeWidth: 2 },
+          markers: { size: 2, colors: Array(30).fill('#111827'), strokeColors: '#111827', strokeWidth: 2 },
         }, false, false);
         await new Promise(r => requestAnimationFrame(r));
       } catch (_) {}
