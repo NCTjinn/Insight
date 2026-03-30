@@ -726,20 +726,20 @@ const state={
    To add a new rule, append an object to the array:
    {
      columns:  ['ColA', 'ColB'],       // ALL must exist in the dataset
-     template: '/templates/my.json',   // path served by your web server
+     template: 'templates/my.json',   // path served by your web server
      name:     'My Template',          // label shown in toast messages
    }
 ============================================================ */
 const TEMPLATE_RULES = [
   {
     columns:  ['Type', 'Mbps'],
-    template: '/templates/testmynet.json',
+    template: 'templates/testmynet.json',
     name:     'TestMyNet',
   },
   // ── Add more rules below ───────────────────────────────────
   // {
   //   columns:  ['Date', 'Revenue', 'Region'],
-  //   template: '/templates/sales.json',
+  //   template: 'templates/sales.json',
   //   name:     'Sales Dashboard',
   // },
 ];
