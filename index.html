@@ -2373,43 +2373,51 @@ function updateSelectionBar(){document.getElementById('selection-count').textCon
  *   scale       {number}  – device-pixel ratio multiplier
  */
 async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 } = {}) {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  // ── Strategy ─────────────────────────────────────────────────────────────
+  // dom-to-image-more cannot reliably render ApexCharts SVGs: the SVG's inline
+  // <style> blocks reference CSS variables that dom-to-image cannot resolve,
+  // so the chart paths render as transparent/invisible in the output.
+  //
+  // Fix: use ApexCharts' own dataURI() exporter (which works correctly) to get
+  // a PNG of the chart area, temporarily replace the live .apexcharts-canvas
+  // with a plain <img> tag, then run dom-to-image on the card.  dom-to-image
+  // then only sees ordinary HTML elements — no SVG or canvas — and works fine.
 
-  // ── 1. Block hover / animation re-paints ────────────────────────────────
   card.classList.add('is-capturing');
 
+  // ── 1. Snapshot the chart via ApexCharts' own exporter ───────────────────
+  let chartWrapper = null;   // the .apexcharts-canvas parent div
+  let placeholder  = null;   // the <img> we inject
+
   if (entry?.apexInstance) {
-    await entry.apexInstance.updateOptions({
-      theme: { mode: 'light' },
-      chart: {
-        animations: { enabled: false, dynamicAnimation: { enabled: false } },
-        foreColor: '#6b7280',
-        background: 'transparent',
-      },
-      tooltip:  { enabled: false },          // no hover tooltip artefact
-      states: {
-        hover:  { filter: { type: 'none' } }, // suppress bar/point hover highlight
-        active: { filter: { type: 'none' } },
-      },
-      grid:  { borderColor: '#e5e7eb' },
-      legend: { labels: { colors: '#6b7280' } },
-    }, true /* redraw – forces a full synchronous re-render into the new theme */,
-       false /* no animate */);
+    try {
+      const { imgURI } = await entry.apexInstance.dataURI();
+
+      // Find the wrapper div that ApexCharts renders into (id="apex-{entry.id}")
+      chartWrapper = card.querySelector(`#apex-${entry.id}`);
+      const canvas  = chartWrapper?.querySelector('.apexcharts-canvas');
+
+      if (canvas && imgURI) {
+        placeholder = document.createElement('img');
+        placeholder.src    = imgURI;
+        placeholder.width  = canvas.offsetWidth;
+        placeholder.height = canvas.offsetHeight;
+        placeholder.style.cssText = 'display:block;max-width:100%';
+        // Hide the live canvas, insert the static snapshot in its place
+        canvas.style.visibility = 'hidden';
+        canvas.style.position   = 'absolute';
+        chartWrapper.insertBefore(placeholder, canvas);
+      }
+    } catch (_) {
+      // dataURI() unavailable (e.g. stats card) — fall through and let
+      // dom-to-image try its best with the live DOM.
+    }
   }
 
-  // Wait for the browser to commit at least two paint frames after ApexCharts'
-  // DOM mutations, then add a short buffer.  A flat setTimeout can fire before
-  // the compositor has finished painting the updated SVG, producing a blank/
-  // transparent capture.  The rAF chain guarantees we're past the next frame.
-  await new Promise(r =>
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() =>
-        setTimeout(r, 150)
-      )
-    )
-  );
+  // Allow the browser one frame to lay out the injected <img>
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  // ── 2. Snapshot ─────────────────────────────────────────────────────────
+  // ── 2. Capture the card ──────────────────────────────────────────────────
   const captureOpts = {
     scale,
     width:  card.offsetWidth,
@@ -2419,25 +2427,16 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
 
   const dataUrl = await domtoimage.toPng(card, captureOpts);
 
-  // ── 3. Cleanup ───────────────────────────────────────────────────────────
+  // ── 3. Restore the live chart ────────────────────────────────────────────
   card.classList.remove('is-capturing');
 
-  if (entry?.apexInstance) {
-    entry.apexInstance.updateOptions({
-      theme: { mode: isDark ? 'dark' : 'light' },
-      chart: {
-        animations: { enabled: true, dynamicAnimation: { enabled: true } },
-        foreColor: isDark ? '#7d8590' : '#6b7280',
-        background: 'transparent',
-      },
-      tooltip:  { enabled: true },
-      states: {
-        hover:  { filter: { type: 'lighten', value: 0.05 } },
-        active: { filter: { type: 'darken',  value: 0.05 } },
-      },
-      grid:  { borderColor: isDark ? '#21282f' : '#e5e7eb' },
-      legend: { labels: { colors: isDark ? '#7d8590' : '#6b7280' } },
-    }, false, false);
+  if (placeholder) {
+    placeholder.remove();
+    const canvas = chartWrapper?.querySelector('.apexcharts-canvas');
+    if (canvas) {
+      canvas.style.visibility = '';
+      canvas.style.position   = '';
+    }
   }
 
   return dataUrl;
