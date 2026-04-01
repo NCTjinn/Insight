@@ -2391,7 +2391,7 @@ function updateSelectionBar(){document.getElementById('selection-count').textCon
  *   transparent {boolean} – omit bgcolor for PNG alpha (image export)
  *   scale       {number}  – device-pixel ratio multiplier
  */
-async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 } = {}) {
+async function _freezeAndCapture(card, entry, { transparent = true, scale = 3 } = {}) {
   // ── Strategy ──────────────────────────────────────────────────────────────
   // dom-to-image-more and html2canvas both fail on ApexCharts SVGs because the
   // SVG's inline <style> blocks use CSS variables that the capture library
@@ -2496,8 +2496,9 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
   // AI summary text (only if visible)
   const summaryBox = card.querySelector('.ai-summary-box');
   const summaryVisible = summaryBox && summaryBox.classList.contains('visible');
-  const summaryText = summaryVisible
-    ? (summaryBox.innerText || summaryBox.textContent || '').trim()
+  const summaryTextEl = summaryVisible ? summaryBox.querySelector('.ai-summary-text') : null;
+  const summaryText = summaryTextEl
+    ? (summaryTextEl.innerText || summaryTextEl.textContent || '').trim()
     : '';
 
   // ── 2. Measure total canvas height ──────────────────────────────────────
@@ -2720,7 +2721,7 @@ async function exportCardPDF(id) {
   if (!card || !entry) return;
 
   try {
-    const dataUrl = await _freezeAndCapture(card, entry, { transparent: false, scale: 2 });
+    const dataUrl = await _freezeAndCapture(card, entry, { transparent: true, scale: 2 });
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
@@ -2785,7 +2786,7 @@ async function exportAllPDF() {
     const entry = state.charts.find(c => c.id === card.id);
 
     try {
-      const dataUrl = await _freezeAndCapture(card, entry, { transparent: false, scale: 2 });
+      const dataUrl = await _freezeAndCapture(card, entry, { transparent: true, scale: 2 });
       if (i > 0) pdf.addPage();
       _addCardToPdf(pdf, dataUrl, card.offsetWidth, card.offsetHeight);
     } catch (err) {
