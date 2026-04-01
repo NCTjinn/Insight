@@ -1700,10 +1700,10 @@ function initApexChart(entry){
         padding: { left: 16, right: 10, top: 0, bottom: 0 },
       },
       markers: {
-        size: d ? 0.01 : 4,
-        colors: d ? undefined : Array(30).fill('#111827'),
-        strokeColors: d ? undefined : '#ffffff',
-        strokeWidth: d ? undefined : 2,
+        size: d ? 4 : 0.01,
+        colors: d ? Array(30).fill('#111827') : undefined,
+        strokeColors: d ? '#ffffff' : undefined,
+        strokeWidth: d ? 2 : undefined,
         hover: { size: 5, sizeOffset: 0 },
       },
       states: {
