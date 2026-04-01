@@ -1700,7 +1700,10 @@ function initApexChart(entry){
         padding: { left: 16, right: 10, top: 0, bottom: 0 },
       },
       markers: {
-        size: 0.01,
+        size: d ? 0.01 : 4,
+        colors: d ? undefined : Array(30).fill('#111827'),
+        strokeColors: d ? undefined : '#ffffff',
+        strokeWidth: d ? undefined : 2,
         hover: { size: 5, sizeOffset: 0 },
       },
       states: {
@@ -2481,12 +2484,17 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
           chart: { foreColor: '#7d8590', background: 'transparent' },
           grid:  { borderColor: '#21282f' },
           legend: { labels: { colors: '#7d8590' } },
-          markers: { size: 0.01, colors: undefined, strokeColors: undefined },
+          markers: { size: 0.01, colors: Array(30).fill('#ffffff'), strokeColors: '#ffffff', strokeWidth: 0 },
         }, false, false);
       } catch (_) {}
     } else {
       try {
-        entry.apexInstance.updateOptions({ markers: { size: 0.01, colors: undefined, strokeColors: undefined } }, false, false);
+        const isCombined = entry.groupByColumn && entry.type !== 'donut';
+        entry.apexInstance.updateOptions({
+          markers: isCombined
+            ? { size: 4, colors: Array(30).fill('#111827'), strokeColors: '#ffffff', strokeWidth: 2 }
+            : { size: 0.01, colors: undefined, strokeColors: undefined },
+        }, false, false);
       } catch (_) {}
     }
   }
