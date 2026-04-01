@@ -2,7 +2,7 @@
 
 > **Turn any spreadsheet into an interactive, AI-powered dashboard — entirely in your browser.**
 
-Insight is a zero-install, single-file web application that lets you drag-and-drop Excel or CSV files (or connect a live Google Sheet) and instantly build a rich, interactive analytics dashboard — complete with statistical KPI cards, multi-series charts, advanced filtering, AI-generated summaries, and professional PDF exports. Because all data processing happens client-side, your raw data never leaves your device.
+Insight is a zero-install, single page web application that lets you drag-and-drop Excel or CSV files (or connect a live Google Sheet) and instantly build a rich, interactive analytics dashboard — complete with statistical KPI cards, multi-series charts, advanced filtering, AI-generated summaries, and professional PDF exports. Because all data processing happens client-side, your raw data never leaves your device.
 
 ---
 
