@@ -2440,29 +2440,31 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
   let chartNaturalH = 0;
   if (entry?.apexInstance) {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    // Switch to export-friendly colours (dark text, transparent bg)
+
+    // Shared marker style used everywhere
+    const MARKERS = { size: 4, colors: Array(30).fill('#111827'), strokeColors: '#ffffff', strokeWidth: 2 };
+
+    // Switch to export-friendly colours before capture
     if (isDark) {
       try {
         await entry.apexInstance.updateOptions({
-          theme: { mode: 'light' },
-          chart: { foreColor: '#111827', background: 'transparent' },
-          grid:  { borderColor: '#e5e7eb' },
+          theme:  { mode: 'light' },
+          chart:  { foreColor: '#111827', background: 'transparent' },
+          grid:   { borderColor: '#e5e7eb' },
           legend: { labels: { colors: '#111827' } },
-          markers: { size: 2, colors: Array(30).fill('#111827'), strokeColors: '#111827', strokeWidth: 2 },
+          markers: MARKERS,
         }, false, false);
-        // One rAF so the SVG re-paints before we snapshot
         await new Promise(r => requestAnimationFrame(r));
       } catch (_) {}
     } else {
-      // Light mode: force markers dark and visible; background already transparent
+      // Light mode: only markers need forcing; everything else is already export-safe
       try {
-        await entry.apexInstance.updateOptions({
-          markers: { size: 2, colors: Array(30).fill('#111827'), strokeColors: '#111827', strokeWidth: 2 },
-        }, false, false);
+        await entry.apexInstance.updateOptions({ markers: MARKERS }, false, false);
         await new Promise(r => requestAnimationFrame(r));
       } catch (_) {}
     }
 
+    // Capture
     try {
       const { imgURI } = await entry.apexInstance.dataURI();
       if (imgURI && imgURI !== 'data:,') {
@@ -2480,23 +2482,15 @@ async function _freezeAndCapture(card, entry, { transparent = false, scale = 3 }
     if (isDark) {
       try {
         entry.apexInstance.updateOptions({
-          theme: { mode: 'dark' },
-          chart: { foreColor: '#7d8590', background: 'transparent' },
-          grid:  { borderColor: '#21282f' },
+          theme:  { mode: 'dark' },
+          chart:  { foreColor: '#7d8590', background: 'transparent' },
+          grid:   { borderColor: '#21282f' },
           legend: { labels: { colors: '#7d8590' } },
-          markers: { size: 0.01, colors: Array(30).fill('#ffffff'), strokeColors: '#ffffff', strokeWidth: 0 },
-        }, false, false);
-      } catch (_) {}
-    } else {
-      try {
-        const isCombined = entry.groupByColumn && entry.type !== 'donut';
-        entry.apexInstance.updateOptions({
-          markers: isCombined
-            ? { size: 4, colors: Array(30).fill('#111827'), strokeColors: '#ffffff', strokeWidth: 2 }
-            : { size: 0.01, colors: undefined, strokeColors: undefined },
+          markers: MARKERS,
         }, false, false);
       } catch (_) {}
     }
+    // Light mode restore: markers were already correct before capture, nothing to undo
   }
 
   // AI summary text (only if visible)
