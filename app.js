@@ -537,9 +537,43 @@ function computeStatsValue(entry) {
   const col = ds.columns.find(c => c.name === entry.statColumn);
   if (!col) return null;
 
+  // Apply time-range filtering using the dataset's date/datetime column,
+  // the same way getChartData() handles categorical x-axis charts.
+  let timeIdxSet = null;
+  const dateCol = ds.columns.find(c => c.role === 'date' || c.role === 'datetime');
+  if (dateCol && dateCol.values.length > 0) {
+    const limits = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': Infinity };
+    const days = state.timeRange === 'CUSTOM' && state.customDateRange
+      ? dateDiffDays(state.customDateRange.from, state.customDateRange.to)
+      : (limits[state.timeRange] || Infinity);
+
+    if (days < Infinity) {
+      let idxs;
+      if (state.timeRange === 'CUSTOM' && state.customDateRange) {
+        const fromMs = new Date(state.customDateRange.from).getTime();
+        const toMs   = new Date(state.customDateRange.to).getTime() + 86399999;
+        idxs = dateCol.values
+          .map((v, i) => ({ v, i }))
+          .filter(({ v }) => v !== null && v >= fromMs && v <= toMs)
+          .map(({ i }) => i);
+      } else {
+        const maxDate = Math.max(...dateCol.values.filter(v => v !== null));
+        const cutoff  = maxDate - (days * 86400000);
+        idxs = dateCol.values
+          .map((v, i) => ({ v, i }))
+          .filter(({ v }) => v !== null && v >= cutoff)
+          .map(({ i }) => i);
+      }
+      timeIdxSet = new Set(idxs);
+    }
+  }
+
   const filterSet = getFilteredRowSet(entry);
-  let rawValues = col.values;
-  if (filterSet !== null) rawValues = col.values.filter((_, i) => filterSet.has(i));
+  let rawValues = col.values.filter((_, i) => {
+    if (timeIdxSet !== null && !timeIdxSet.has(i)) return false;
+    if (filterSet !== null && !filterSet.has(i)) return false;
+    return true;
+  });
 
   const nums = rawValues.map(v => typeof v === 'number' ? v : parseFloat(v)).filter(v => isFinite(v));
   if (nums.length === 0) return { value: null, count: 0 };
