@@ -13,6 +13,7 @@ const state={
   selectedChartType:'line',
   nextId:          1,
   _worker:         null,
+  activePrompt:    null,   // custom prompt text loaded from ./prompts/ for the matched template
 };
 
 /* ============================================================
@@ -25,20 +26,27 @@ const state={
    To add a new rule, append an object to the array:
    {
      columns:  ['ColA', 'ColB'],       // ALL must exist in the dataset
-     template: 'templates/my.json',   // path served by your web server
+     template: 'templates/my.json',    // path served by your web server
+     prompt:   'prompts/my.txt',       // (optional) custom AI prompt file
      name:     'My Template',          // label shown in toast messages
    }
+
+   Prompt files live in ./prompts/ and contain plain-text instructions
+   that are appended to the AI summary request for this template's charts.
+   Leave prompt undefined (or omit it) to use the default system prompt.
 ============================================================ */
 const TEMPLATE_RULES = [
   {
     columns:  ['Type', 'Mbps'],
     template: 'templates/testmynet.json',
+    prompt:   'prompts/testmynet.txt',
     name:     'TestMyNet',
   },
   // ── Add more rules below ───────────────────────────────────
   // {
   //   columns:  ['Date', 'Revenue', 'Region'],
   //   template: 'templates/sales.json',
+  //   prompt:   'prompts/sales.txt',
   //   name:     'Sales Dashboard',
   // },
 ];
@@ -68,10 +76,28 @@ async function detectAndApplyTemplate(dataset) {
     // ── Match found ───────────────────────────────────────────
     showToast(`Detected "${rule.name}" layout — loading template…`, 'success');
 
+    // Load template JSON and optional custom prompt in parallel
+    const fetches = [fetch(rule.template)];
+    if (rule.prompt) fetches.push(fetch(rule.prompt));
+
     try {
-      const res = await fetch(rule.template);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const tpl = await res.json();
+      const [tplRes, promptRes] = await Promise.all(fetches);
+
+      if (!tplRes.ok) throw new Error(`HTTP ${tplRes.status}`);
+      const tpl = await tplRes.json();
+
+      // Store the custom prompt text (or null if none defined)
+      if (promptRes) {
+        if (promptRes.ok) {
+          state.activePrompt = await promptRes.text();
+          console.log(`[Insight] Loaded custom prompt from "${rule.prompt}" (${state.activePrompt.length} chars)`);
+        } else {
+          console.warn(`[Insight] Custom prompt "${rule.prompt}" not found (HTTP ${promptRes.status}) — using default.`);
+          state.activePrompt = null;
+        }
+      } else {
+        state.activePrompt = null;
+      }
 
       state.charts  = [];
       state.nextId  = 1;
@@ -82,12 +108,14 @@ async function detectAndApplyTemplate(dataset) {
     } catch (err) {
       console.error(`[Insight] Failed to load template "${rule.name}":`, err);
       showToast(`Template load failed (${err.message}) — using auto charts`, 'error');
+      state.activePrompt = null;
       initDashboard();  // graceful fallback
     }
     return;
   }
 
-  // ── No rule matched — default behaviour ───────────────────
+  // ── No rule matched — clear any previously loaded prompt ─────
+  state.activePrompt = null;
   initDashboard();
 }
 
@@ -1355,6 +1383,8 @@ async function generateSummary(id) {
       y_column:    entry.yColumn,
       y_stats:     yStats,
       x_sample:    xSample,
+      // Inject template-specific prompt if one was loaded for this dataset
+      ...(state.activePrompt ? { custom_instructions: state.activePrompt } : {}),
     };
 
     console.log('[Insight] Calling backend /summarise for range', rangeKey, body);

@@ -100,12 +100,13 @@ class NumericStats(BaseModel):
     row_count:    Optional[int]   = None
 
 class SummariseRequest(BaseModel):
-    chart_title:  str   = Field(..., description="Title of the chart being summarised")
-    chart_type:   str   = Field(..., description="line | bar | area | donut")
-    x_column:     str   = Field(..., description="Name of the x-axis column")
-    y_column:     str   = Field(..., description="Name of the y-axis column")
-    y_stats:      NumericStats = Field(..., description="Derived stats for the y-axis column")
-    x_sample:     Optional[list]  = Field(None, description="Up to 20 representative x-axis labels")
+    chart_title:          str   = Field(..., description="Title of the chart being summarised")
+    chart_type:           str   = Field(..., description="line | bar | area | donut")
+    x_column:             str   = Field(..., description="Name of the x-axis column")
+    y_column:             str   = Field(..., description="Name of the y-axis column")
+    y_stats:              NumericStats = Field(..., description="Derived stats for the y-axis column")
+    x_sample:             Optional[list]  = Field(None, description="Up to 20 representative x-axis labels")
+    custom_instructions:  Optional[str]   = Field(None, description="Extra domain-specific instructions loaded from a ./prompts/ file on the frontend")
 
 class SummariseResponse(BaseModel):
     summary:    str
@@ -172,6 +173,8 @@ def build_prompt(req: SummariseRequest) -> str:
     """
     Construct the user-turn prompt from derived stats.
     Only statistical summaries are included — no raw row values.
+    If the frontend loaded a template-specific prompt file, its contents
+    are appended as domain-specific instructions for the AI.
     """
     s = req.y_stats
     lines = [
@@ -197,6 +200,13 @@ def build_prompt(req: SummariseRequest) -> str:
     if req.x_sample:
         sample = req.x_sample[:20]   # cap at 20 labels
         lines.append(f"\nX-axis label sample: {json.dumps(sample)}")
+
+    if req.custom_instructions:
+        instructions = req.custom_instructions.strip()
+        if instructions:
+            lines.append("\n── Domain-specific instructions ──")
+            lines.append(instructions)
+            log.info("Prompt augmented with custom instructions (%d chars)", len(instructions))
 
     lines.append("\nReturn the JSON summary as specified in your instructions.")
     return "\n".join(lines)

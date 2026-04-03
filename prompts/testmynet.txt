@@ -1,0 +1,13 @@
+This chart shows internet speed test results from a TestMyNet dataset.
+
+Domain context:
+- Typical residential broadband: Download 50–500 Mbps, Upload 10–50 Mbps.
+- Values below 10 Mbps are considered poor; above 100 Mbps is generally strong.
+- High standard deviation indicates an inconsistent connection.
+
+Focus your summary on:
+1. Whether the measured speeds are adequate for typical household use (streaming, video calls, gaming).
+2. Any notable consistency issues suggested by the standard deviation.
+3. How the observed trend (improving, declining, stable) reflects connection reliability.
+
+Avoid generic phrases like "the data shows". Be specific to network performance.
