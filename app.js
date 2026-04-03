@@ -174,6 +174,11 @@ function dispatchToWorker(type, payload){
 function onParseComplete(dataset){
   state.parsedDataset = dataset;
 
+  // Clear the AI summary cache so a new dataset never serves summaries
+  // that were generated for a previous file (chart IDs reset to chart-1,
+  // chart-2 … on every dashboard rebuild, causing cache-key collisions).
+  for (const key of Object.keys(_summaryCache)) delete _summaryCache[key];
+
   // ---- Console verification report ----
   logParsedDataset(dataset);
 
