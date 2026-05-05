@@ -288,7 +288,7 @@ function detectRole(values) {
   const numericCount = nonEmpty.filter(v => {
     if (typeof v === 'number') return isFinite(v);
     const s = String(v).replace(/[$,%\s]/g, '');
-    return s !== '' && !isNaN(parseFloat(s)) && isFinite(parseFloat(s));
+    return s !== '' && !isNaN(Number(s)) && isFinite(Number(s));
   }).length;
   if (numericCount / nonEmpty.length >= 0.8) return 'numeric';
 

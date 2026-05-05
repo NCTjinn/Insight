@@ -353,16 +353,19 @@ function onDrop(e){e.preventDefault();e.currentTarget.classList.remove('drag-ove
 function handleFileInput(e){const f=e.target.files[0];if(f)processFile(f)}
 
 function processFile(file){
-  const ext=file.name.split('.').pop().toLowerCase();
-  if(!['xlsx','xls','csv'].includes(ext)){showToast('Unsupported file type. Please use .xlsx, .xls, or .csv','error');return;}
-  const reader=new FileReader();
-  if(ext==='csv'){
-    reader.onload=ev=>dispatchToWorker('PARSE_CSV_TEXT',{text:ev.target.result,fileName:file.name});
-    reader.readAsText(file);
-  } else {
-    reader.onload=ev=>dispatchToWorker('PARSE_EXCEL',{buffer:ev.target.result,fileName:file.name});
-    reader.readAsArrayBuffer(file);
-  }
+    const ext=file.name.split('.').pop().toLowerCase();
+    if(!['xlsx','xls','csv'].includes(ext)){
+        showToast('Unsupported file type. Please use .xlsx, .xls, or .csv','error');
+        return;
+    }
+    const reader=new FileReader();
+    if(ext==='csv'){
+        reader.onload=ev=>dispatchToWorker('PARSE_CSV_TEXT',{text:ev.target.result,fileName:file.name});
+        reader.readAsText(file);
+    } else {
+        reader.onload=ev=>dispatchToWorker('PARSE_EXCEL',{buffer:ev.target.result,fileName:file.name});
+        reader.readAsArrayBuffer(file);
+    }
 }
 
 function handleSheetsURL(){
